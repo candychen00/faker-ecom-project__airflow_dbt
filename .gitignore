@@ -1,1 +1,10 @@
 .venv
+.mypy_cache
+__pycache__
+logs
+.git
+
+# secrets
+.env
+gcp-key.json
+secret/
