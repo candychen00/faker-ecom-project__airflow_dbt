@@ -86,6 +86,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/pytests:/opt/airflow/pytests
+    - ${AIRFLOW_PROJ_DIR:-.}/secret:/opt/airflow/secret:ro
 
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:

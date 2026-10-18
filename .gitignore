@@ -8,3 +8,6 @@ logs
 .env
 gcp-key.json
 secret/
+
+# tests
+airflow/dags/test.py
