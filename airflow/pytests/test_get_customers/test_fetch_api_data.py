@@ -2,7 +2,8 @@ import pytest
 import requests
 import unittest.mock as mock
 
-from plugins.fn_get_customers import fetch_api_data # type: ignore[import-not-found]
+from airflow.plugins.fn_api_get import get_api_data      # type: ignore
+
 
 @pytest.fixture
 def fixture_correct_cust_data():
@@ -24,7 +25,7 @@ def fixture_correct_cust_data():
     ]
 
 
-@mock.patch("plugins.helper_functions.requests.get")
+@mock.patch("plugins.fn_api_get.requests.get")
 def test_fetch_api_data_correct(mock_get, fixture_correct_cust_data):
     mock_res = mock.Mock()
     mock_res.status_code = 200
@@ -32,13 +33,13 @@ def test_fetch_api_data_correct(mock_get, fixture_correct_cust_data):
     mock_res.json.return_value = fixture_correct_cust_data
 
     mock_get.return_value = mock_res
-    api_result = fetch_api_data("api.com", {"X_API_KEY": 123}, 10)
+    api_result = get_api_data("api.com", {"X-API-Key": 123}, 10)
 
     assert api_result["status"] == "success"
     assert api_result["data"] == fixture_correct_cust_data
 
 
-@mock.patch("plugins.helper_functions.requests.get")
+@mock.patch("plugins.fn_api_get.requests.get")
 def test_fetch_api_data_wrong(mock_get):
     mock_res = mock.Mock()
     mock_res.status_code = 400
@@ -46,4 +47,4 @@ def test_fetch_api_data_wrong(mock_get):
 
     mock_get.return_value = mock_res
     with pytest.raises(requests.exceptions.HTTPError):
-        fetch_api_data("api.com", {"X_API_KEY": 123}, 10)
+        get_api_data("api.com", {"X-API-Key": 123}, 10)

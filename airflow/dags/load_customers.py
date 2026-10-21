@@ -7,31 +7,36 @@ from dotenv import load_dotenv
 from pprint import pprint
 from pathlib import Path
 import pandas as pd  # type: ignore
+import requests
 
-from plugins.fn_get_customers import fetch_api_data, verify_customers   # type: ignore
+from plugins.fn_api_get import get_api_data     # type: ignore
+from plugins.fn_api_verification import verify_api      # type: ignore
+from plugins.api_schemas.customers import CustomersBase         # type: ignore
+
 
 
 load_dotenv()
-CUSTOMERS_API_URL=os.getenv("CUSTOMERS_API_URL")
-CUSTOMERS_API_HEADERS = {
-    "X-API-Key": os.getenv("CUSTOMERS_API_KEY")
+ECOM_API_URL=os.getenv("ECOM_API_URL")
+ECOM_API_HEADERS = {
+    "X-API-Key": os.getenv("ECOM_API_KEY")
 }
 GCP_CLOUD_STORAGE_PROJECT_ID= os.getenv("GCP_CLOUD_STORAGE_PROJECT_ID")
 GCP_CLOUD_STORAGE_BUCKET_NAME= os.getenv("GCP_CLOUD_STORAGE_BUCKET_NAME")
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
 
 
 @dag(
     schedule=None
 )
-def get_customers():
+def load_customers():
 
     @task
-    def get_api_data():
+    def fetch_api_data():
         cust_num = 2
-        result = fetch_api_data(
-            input_url = f"{CUSTOMERS_API_URL}/customers/fake_customers?num={cust_num}", 
-            input_headers = CUSTOMERS_API_HEADERS, 
+        result = get_api_data(
+            input_url = f"{ECOM_API_URL}/customers/fake_customers?num={cust_num}", 
+            input_headers = ECOM_API_HEADERS, 
             input_timeout = 60
         )
         if result["status"] == "success":
@@ -40,7 +45,7 @@ def get_customers():
 
     @task
     def verify_api_data(list_customers):
-        result = verify_customers(list_customers)
+        result = verify_api(list_customers, CustomersBase)
         pprint(result)
         return result
 
@@ -80,9 +85,24 @@ def get_customers():
     )
 
 
-    data = get_api_data()
+    @task
+    def send_success_msg():
+        ctx = get_current_context()
+        dag_name = ctx["dag"].dag_id
+        run_time = ctx["logical_date"].in_timezone("Asia/Taipei").strftime("%Y-%m-%d %H:%M")
+
+        webhook_url = DISCORD_WEBHOOK
+        requests.post(webhook_url, json={
+            "content": 
+            f"Airflow Dag: {dag_name}\n"
+            f"Datetime: {run_time}\n"
+            "Finished run."
+        })
+
+
+    data = fetch_api_data()
     verified_data = verify_api_data(data)
-    save_to_tmp_folder(verified_data) >> upload_to_gcs >> upload_to_bq
+    save_to_tmp_folder(verified_data) >> upload_to_gcs >> upload_to_bq >> send_success_msg()
 
 
-get_customers()
+load_customers()

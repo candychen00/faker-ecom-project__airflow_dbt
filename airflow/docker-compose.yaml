@@ -78,6 +78,7 @@ x-airflow-common:
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
 
     AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: ${AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT}
+    AIRFLOW_CONN_DISCORD: ${AIRFLOW_CONN_DISCORD}
 
 
   volumes:

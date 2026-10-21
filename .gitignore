@@ -10,4 +10,4 @@ gcp-key.json
 secret/
 
 # tests
-airflow/dags/test.py
+airflow/dags/tests/

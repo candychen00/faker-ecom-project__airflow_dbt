@@ -1,8 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from plugins.fn_get_customers import verify_customers # type: ignore[import-not-found]
-from pytests.fn_get_customers.test_fetch_api_data import fixture_correct_cust_data # type: ignore[import-not-found]
+from plugins.fn_api_verification import verify_api      # type: ignore[import-not-found]
+from plugins.api_schemas.customers import CustomersBase      # type: ignore[import-not-found]
+
+from pytests.test_get_customers.test_fetch_api_data import fixture_correct_cust_data      # type: ignore[import-not-found]
 
 
 @pytest.fixture
@@ -48,7 +50,7 @@ def fixture_wrong_cust_data():
 
 
 def test_correct_cust_api_data(fixture_correct_cust_data):
-    result = verify_customers(fixture_correct_cust_data)
+    result = verify_api(fixture_correct_cust_data, CustomersBase)
     assert result == {
         "valid_count": 2,
         "valid_list": fixture_correct_cust_data,
@@ -58,7 +60,7 @@ def test_correct_cust_api_data(fixture_correct_cust_data):
 
 
 def test_wrong_cust_api_data(fixture_wrong_cust_data):
-    result = verify_customers(fixture_wrong_cust_data)
+    result = verify_api(fixture_wrong_cust_data, CustomersBase)
     error0 = result["invalid_list"][0]["Error message"]
     error1 = result["invalid_list"][1]["Error message"]
     error2 = result["invalid_list"][2]["Error message"]

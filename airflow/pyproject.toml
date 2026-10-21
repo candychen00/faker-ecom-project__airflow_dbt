@@ -11,4 +11,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "apache-airflow==3.3.2",
+    "pandas>=3.0.6",
+    "psycopg[binary]>=3.3.6",
+    "sqlalchemy>=2.1.5",
 ]
