@@ -10,10 +10,10 @@ def verify_api(cust_list, api_schema):
             cust = api_schema.model_validate(i)
         except ValidationError as e:
             invalid.append({
-                "Error message": e,
+                "Error message": str(e),
                 "Error item": i,
             })
-        else: 
+        else:
             valid.append(i)
         finally:
             print(f"Finish varifying {i}")

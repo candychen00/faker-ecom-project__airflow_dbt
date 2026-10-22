@@ -9,6 +9,7 @@ def get_api_data(input_url: str, input_headers: dict, input_timeout: int = 30):
         res.raise_for_status()
     except requests.exceptions.HTTPError as e:
         print(e)
+        print(f"API error response: {e.response.text}")
         raise
     else:
         print("Fetched data from API.")

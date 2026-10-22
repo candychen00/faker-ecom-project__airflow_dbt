@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 from plugins.fn_api_verification import verify_api      # type: ignore[import-not-found]
 from plugins.api_schemas.customers import CustomersBase      # type: ignore[import-not-found]
@@ -70,8 +69,8 @@ def test_wrong_cust_api_data(fixture_wrong_cust_data):
     assert result["valid_count"] == 0
     assert result["valid_list"] == []
     assert result["invalid_count"] == 5
-    assert isinstance(error0, ValidationError) # check if the error message is Validation error
-    assert isinstance(error1, ValidationError)
-    assert isinstance(error2, ValidationError)
-    assert isinstance(error3, ValidationError)
-    assert isinstance(error4, ValidationError)
+    assert isinstance(error0, str) and "validation error" in error0 # check if the error message is Validation error
+    assert isinstance(error1, str) and "validation error" in error1
+    assert isinstance(error2, str) and "validation error" in error2
+    assert isinstance(error3, str) and "validation error" in error3
+    assert isinstance(error4, str) and "validation error" in error4

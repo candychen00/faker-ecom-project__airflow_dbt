@@ -1,6 +1,7 @@
 from airflow.sdk import task, dag, get_current_context
 from airflow.providers.google.cloud.transfers.local_to_gcs import LocalFilesystemToGCSOperator  # type: ignore
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator  # type: ignore
+from airflow.providers.google.cloud.operators.bigquery import BigQueryCreateEmptyDatasetOperator        # type: ignore
 
 import os
 from dotenv import load_dotenv
@@ -33,7 +34,7 @@ def load_customers():
 
     @task
     def fetch_api_data():
-        cust_num = 2
+        cust_num = 50
         result = get_api_data(
             input_url = f"{ECOM_API_URL}/customers/fake_customers?num={cust_num}", 
             input_headers = ECOM_API_HEADERS, 
@@ -53,11 +54,15 @@ def load_customers():
     @task
     def save_to_tmp_folder(cust_list):
         if len(cust_list["valid_list"]) > 0:
+            # create /tmp if not exists
             tmp_dir = Path("/tmp")
             tmp_dir.mkdir(parents=True, exist_ok=True)
 
+            # convert dict -> df
             df = pd.DataFrame(cust_list["valid_list"])
 
+            # convert dict -> csv
+            # save to tmp
             output_file = tmp_dir / "customers.csv"
             df.to_csv(output_file, index=False, header=True)
             print("Saved data to tmp folder.")
@@ -67,19 +72,39 @@ def load_customers():
 
     upload_to_gcs = LocalFilesystemToGCSOperator(
         task_id= "upload_to_gcs",
-        src= "/tmp/customers.csv",
-        dst= "date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/customers_{{ logical_date.in_timezone('Asia/Taipei').strftime('%Y%m%dT%H%M%S') }}.csv",
-        bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
         gcp_conn_id= "google_cloud_default",
+
+        # local
+        src= "/tmp/customers.csv",
+
+        # gcs
+        bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
+        dst= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/customers_{{ logical_date.in_timezone('Asia/Taipei').strftime('%Y%m%dT%H%M%S') }}.csv",  
+    )
+
+    create_bq_dataset = BigQueryCreateEmptyDatasetOperator(
+        task_id="create_bq_dataset",
+        gcp_conn_id= "google_cloud_default",
+
+        project_id=GCP_CLOUD_STORAGE_PROJECT_ID,
+        dataset_id="raw_data",
+        location= "us-east1",
+        exists_ok=True, # Dataset 已存在時，不會因為重複建立而失敗
     )
 
 
     upload_to_bq = GCSToBigQueryOperator(
         task_id= "upload_to_bq",
+        gcp_conn_id= "google_cloud_default",
+
+        # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        source_objects= "date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/*.csv",
+        source_objects= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/*.csv",
         source_format="CSV",
-        destination_project_dataset_table= "raw_customers.customers",
+
+        # bq
+        destination_project_dataset_table= "raw_data.raw_customers",
+        location= "us-east1",
         autodetect= True,
         write_disposition="WRITE_APPEND",
     )
@@ -102,7 +127,7 @@ def load_customers():
 
     data = fetch_api_data()
     verified_data = verify_api_data(data)
-    save_to_tmp_folder(verified_data) >> upload_to_gcs >> upload_to_bq >> send_success_msg()
+    save_to_tmp_folder(verified_data) >> upload_to_gcs >> create_bq_dataset >> upload_to_bq >> send_success_msg()
 
 
 load_customers()

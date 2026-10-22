@@ -2,7 +2,7 @@ import pytest
 import requests
 import unittest.mock as mock
 
-from airflow.plugins.fn_api_get import get_api_data      # type: ignore
+from plugins.fn_api_get import get_api_data      # type: ignore
 
 
 @pytest.fixture

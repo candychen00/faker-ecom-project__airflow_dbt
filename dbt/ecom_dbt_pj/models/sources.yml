@@ -1,0 +1,7 @@
+sources:
+  - name: ecom
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_data    # bigquery dataset
+    tables:
+      - name: customers # alias table name
+        identifier: customers  # actual table name

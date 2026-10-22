@@ -1,4 +1,6 @@
 from airflow.sdk import dag, task, task_group, get_current_context
+from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator      #type:ignore
+from airflow.providers.google.cloud.transfers.local_to_gcs import LocalFilesystemToGCSOperator      #type:ignore
 
 from plugins.fn_api_get import get_api_data         #type:ignore
 from plugins.fn_api_verification import verify_api      #type:ignore
@@ -15,14 +17,20 @@ import requests
 import os
 from dotenv import load_dotenv
 from pprint import pprint
+from pathlib import Path
+import json
 
 
 
+# load env variables
 load_dotenv()
+
 ECOM_API_URL = os.getenv("ECOM_API_URL")
 ECOM_HEADERS = { "X-API-Key": os.getenv("ECOM_API_KEY")}
 POSTGRES_URL = os.getenv("NEON_POSTGRES_URL")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
+
+GCP_CLOUD_STORAGE_BUCKET_NAME = os.getenv("GCP_CLOUD_STORAGE_BUCKET_NAME")
 
 
 # Postgres DB Connection
@@ -31,10 +39,11 @@ metadata = MetaData()
 
 
 
+
 @dag(
     schedule=None
 )
-def load_products_to_pg():
+def load_products():
 
     @task
     def fetch_products_api():
@@ -102,15 +111,65 @@ def load_products_to_pg():
 
 
     @task(trigger_rule="none_failed_min_one_success")
-    def verify_prod_tbl():
+    def verify_prod_tbl() -> list[dict]:
         df_actual = pd.read_sql(
             con= engine,
             sql= "select * from ecom_products;"
         )
         df_expect = pd.DataFrame(prod_data)
+
+        # conpare if df_actual and df_expect is the same
         assert_frame_equal(df_actual, df_expect)
 
+        return df_actual.to_dict(orient="records")
 
+
+    @task
+    def save_to_tmp(data: list[dict]):
+        # create /tmp folder if not exists
+        output_path = Path("/tmp")
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # convert dict -> df
+        df = pd.DataFrame(data)
+
+        # convert df -> csv
+        # save csv to tmp
+        output_file = output_path / "products.csv"
+        df.to_csv(output_file, mode="w", index=False)
+        print("Saved data to tmp folder.")
+
+
+    upload_to_gcs = LocalFilesystemToGCSOperator(
+        task_id= "upload_to_gcs",
+        gcp_conn_id="google_cloud_default",
+
+        # local
+        src= "/tmp/products.csv",
+
+        # gsc
+        bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
+        dst= "products/products.csv",
+    )
+
+
+    upload_to_bq = GCSToBigQueryOperator(
+        task_id= "upload_to_bq",
+        gcp_conn_id="google_cloud_default",
+
+        # gcs
+        bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
+        source_objects = "products/products.csv",
+        source_format= "CSV",
+
+        # bq
+        destination_project_dataset_table= "raw_data.raw_products",
+        create_disposition= "CREATE_IF_NEEDED",
+        write_disposition= "WRITE_TRUNCATE",
+        location= "us-east1",
+        autodetect= True,
+    )
+        
 
     @task
     def send_success_msg():
@@ -133,11 +192,14 @@ def load_products_to_pg():
     create_tbl = create_table_if_not_exists()
     branch = check_prod_table_len()
     group = save_data_to_pg_group(api_data)
-    check_prod_tbl = verify_prod_tbl()
+    verified_data = verify_prod_tbl()
+    to_tmp = save_to_tmp(verified_data)
+    to_gcs = upload_to_gcs
+    to_bq = upload_to_bq
     success = send_success_msg()
 
-    api_data >> create_tbl >> branch >> group >> check_prod_tbl >> success
-    branch >> check_prod_tbl >> success
+    api_data >> create_tbl >> branch >> group >> verified_data >> to_tmp >> to_gcs >> to_bq >> success
+    branch >> verified_data >> to_tmp >> to_gcs >> to_bq >> success
 
 
-load_products_to_pg()
+load_products()
