@@ -6,6 +6,6 @@ dedup as (
 )
 
 SELECT
-    {{ dbt_utils.generate_surrogate_key(['product_id']) }} as product_sk,
+    {{ dbt_utils.generate_surrogate_key(['product_id', 'price', 'fruit', 'category']) }} as product_sk,
     *
 FROM dedup

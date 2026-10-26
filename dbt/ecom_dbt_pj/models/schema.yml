@@ -1,10 +1,19 @@
 
 models:
   - name: dim_products
+    config:
+      contract:
+        enforced: true
     columns:
 
+      - name: product_sk
+        data_type: string(50)
+        data_tests:
+          - not_null
+          - unique
+
       - name: product_id
-        data_type: int64
+        data_type: integer
         data_tests:
           - not_null
           - unique
@@ -14,7 +23,7 @@ models:
                 max_value: 39
 
       - name: product
-        data_type: string
+        data_type: string(50)
         data_tests:
           - not_null
           - unique
@@ -25,6 +34,7 @@ models:
                 seperator: " "
 
       - name: prod_category
+        data_type: string(30)
         data_tests:
           - not_null
           - accepted_values:
@@ -32,6 +42,7 @@ models:
                 values: ['Juice', 'Jam', 'Dried Snacks', 'Smoothie', 'Gummies']
 
       - name: prod_fruit
+        data_type: string(30)
         data_tests:
           - not_null
           - accepted_values:
@@ -39,19 +50,32 @@ models:
                 values: ['Apple', 'Banana', 'Orange', 'Strawberry', 'Mango', 'Blueberry', 'Peach', 'Pineapple']
 
       - name: unit_price
+        data_type: numeric(5,2) # decimal
         data_tests:
           - not_null
 
 
+
   - name: dim_customers
+    config:
+      contract:
+        enforced: true
     columns:
 
+      - name: customer_sk
+        data_type: string(50)
+        data_tests:
+          - not_null
+          - unique
+
       - name: customer_id
+        data_type: string(50)
         data_tests:
           - unique
           - not_null
 
       - name: first_name
+        data_type: string(30)
         data_tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
@@ -60,6 +84,7 @@ models:
                 regex: "^[A-Z][a-z]+$"
 
       - name: last_name
+        data_type: string(30)
         data_tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
@@ -68,6 +93,7 @@ models:
                 regex: "^[A-Z][a-z]+$"
 
       - name: full_name
+        data_type: string(50)
         data_tests:
           - not_null
           - concat_two_strings:
@@ -77,6 +103,7 @@ models:
                 seperator: " "
 
       - name: state
+        data_type: string(50)
         data_tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
@@ -85,27 +112,48 @@ models:
                 regex: '^[A-Z][a-z]+(?: [A-Z][a-z]+)*$'
 
       - name: email
+        data_type: string(50)
         data_tests:
           - not_null
       
       - name: signup_date
+        data_type: date
         data_tests:
           - not_null
 
 
+
   - name: fct_orders
+    config:
+      contract:
+        enforced: true
     columns:
 
+      - name: order_row_num
+        data_type: integer
+        data_tests:
+          - not_null
+          - unique
+
+      - name: order_sk
+        data_type: string(50)
+        data_tests:
+          - not_null
+          - unique   
+
       - name: order_id
+        data_type: string(50)
         data_tests:
           - not_null
           - unique
       
       - name: order_at
+        data_type: datetime
         data_tests:
           - not_null
 
       - name: product_id
+        data_type: integer
         data_tests:
           - not_null
           - relationships:
@@ -114,10 +162,30 @@ models:
                 field: product_id
 
       - name: customer_id
+        data_type: string(50)
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_customers')
                 field: customer_id
+
+      - name: ord_quantity
+        data_type: integer
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                strictly: true # > 0, not equals to zero
+          
+      - name: order_amt
+        data_type: numeric(8,2)
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              name: order_amt_greater_than_zero
+              arguments:
+                min_value: 0
+                strictly: true # > 0, not equals to zero
 

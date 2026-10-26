@@ -6,7 +6,7 @@ dedup as (
 )
 
 SELECT
-    {{ dbt_utils.generate_surrogate_key(['customer_id']) }} as customer_sk,
+    {{ dbt_utils.generate_surrogate_key(['customer_id', 'name', 'email', 'state', 'signup_date']) }} as customer_sk,
     *
 FROM dedup
 

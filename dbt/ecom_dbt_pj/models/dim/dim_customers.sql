@@ -3,8 +3,7 @@ with src_cust as (
 )
 
 select
-    /* row_number() over (order by customer_id) as customer_unique_id, */
-    /*{{ dbt_utils.generate_surrogate_key(['customer_id']) }} as customer_key,*/
+    customer_sk,
     customer_id,
     name as full_name,
     SPLIT(name, ' ')[SAFE_OFFSET(0)] AS first_name,

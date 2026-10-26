@@ -10,9 +10,10 @@ dim_prod as (
 )
 
 SELECT
-    row_number() over () as order_unique_id,
+    row_number() over() as order_row_num,
+    ord.order_sk,
     ord.order_id,
-    ord.order_at,
+    cast( ord.order_at as datetime ) as order_at,
     ord.customer_id,
     ord.product_id,
     ord.quantity as ord_quantity,

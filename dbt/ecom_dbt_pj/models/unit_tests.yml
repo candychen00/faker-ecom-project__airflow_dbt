@@ -1,0 +1,29 @@
+
+unit_tests:
+
+  - name: unittest_src_products_dedup
+    model: src_products
+    given:
+      - input: source('ecom_raw', 'products')
+        format: dict
+        rows:
+          - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+          - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+    expect:
+      format: dict
+      rows: 
+        - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+
+
+  - name: unittest_src_customers_dedup
+    model: src_customers
+    given:
+      - input: source('ecom_raw', 'customers')
+        format: dict
+        rows:
+          - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
+          - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
+    expect:
+      format: dict
+      rows:
+        - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
