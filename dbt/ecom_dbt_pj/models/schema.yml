@@ -1,0 +1,123 @@
+
+models:
+  - name: dim_products
+    columns:
+
+      - name: product_id
+        data_type: int64
+        data_tests:
+          - not_null
+          - unique
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 39
+
+      - name: product
+        data_type: string
+        data_tests:
+          - not_null
+          - unique
+          - concat_two_strings:
+              arguments:
+                col_a: prod_fruit
+                col_b: prod_category
+                seperator: " "
+
+      - name: prod_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Juice', 'Jam', 'Dried Snacks', 'Smoothie', 'Gummies']
+
+      - name: prod_fruit
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Apple', 'Banana', 'Orange', 'Strawberry', 'Mango', 'Blueberry', 'Peach', 'Pineapple']
+
+      - name: unit_price
+        data_tests:
+          - not_null
+
+
+  - name: dim_customers
+    columns:
+
+      - name: customer_id
+        data_tests:
+          - unique
+          - not_null
+
+      - name: first_name
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              name: customer_first_name_start_with_capital
+              arguments:
+                regex: "^[A-Z][a-z]+$"
+
+      - name: last_name
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              name: customer_last_name_start_with_capital
+              arguments: 
+                regex: "^[A-Z][a-z]+$"
+
+      - name: full_name
+        data_tests:
+          - not_null
+          - concat_two_strings:
+              arguments:
+                col_a: first_name
+                col_b: last_name
+                seperator: " "
+
+      - name: state
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              name: customer_state_start_with_capital
+              arguments: 
+                regex: '^[A-Z][a-z]+(?: [A-Z][a-z]+)*$'
+
+      - name: email
+        data_tests:
+          - not_null
+      
+      - name: signup_date
+        data_tests:
+          - not_null
+
+
+  - name: fct_orders
+    columns:
+
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      
+      - name: order_at
+        data_tests:
+          - not_null
+
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+
