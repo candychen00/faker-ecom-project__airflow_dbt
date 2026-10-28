@@ -16,7 +16,7 @@ env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   DOCKER_REPO: ecom-pj-repo
-  DOCKER_TAG: v1
+  DOCKER_TAG: ${{ github.sha }}
   GCP_JOB_NAME: ecom-pj
   GCP_JOB_REGION: us-east1
 
@@ -134,4 +134,4 @@ jobs:
         run: |
           gcloud run jobs update ${{ env.GCP_JOB_NAME }} \
             --region ${{ env.GCP_JOB_REGION }} \
-            --image ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ env.DOCKER_TAG }}
+            --image docker.io/${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ env.DOCKER_TAG }}
