@@ -30,9 +30,6 @@ jobs:
       run:
         working-directory: dbt
 
-    env:
-      GCP_PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
-
     permissions:
       contents: 'read'
       id-token: 'write'
