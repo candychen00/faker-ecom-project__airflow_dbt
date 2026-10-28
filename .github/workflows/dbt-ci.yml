@@ -36,6 +36,7 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+      pages: 'write'
 
 
     steps:
@@ -127,6 +128,9 @@ jobs:
     name: build-docker-image
     needs: dbt-ci # dbt-ci 成功後才會執行
     runs-on: ubuntu-latest
+
+    permissions:
+        contents: read
 
     steps:
       - name: Checkout

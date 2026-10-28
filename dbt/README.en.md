@@ -50,7 +50,7 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
 | Source | `models/src/` | view | Generates a `*_sk` surrogate key for each record and keeps the original columns |
 | Intermediate | `models/intermediate/` | table | Deduplicates by `*_sk` (the raw and source layers may contain duplicates) |
 | Dimension | `models/dim/` | table | `dim_customers` and `dim_products`, with cleaned data |
-| Fact | `models/fct/` | incremental | `fct_orders`: `merge` strategy, `unique_key = order_id`, `on_schema_change = fail`; incremental runs only process rows whose `updated_at` is within 3 hours before the current maximum, to cover late-arriving data |
+| Fact | `models/fct/` | incremental | `fct_orders` table with `merge` strategy, `unique_key = order_id`, `on_schema_change = fail`; incremental runs only process rows whose `updated_at` is within 3 hours before the current maximum, to cover late-arriving data |
 | Mart | `models/mart/` | table | Aggregates `ord_quantity` and `order_amt` by product / category / fruit, daily or monthly |
 | Data quality | `models/data_quality/` | table | Duplicate monitoring (see below) |
 
@@ -60,8 +60,10 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
 
 `mart_daily_by_prod` / `mart_monthly_by_prod` are the finest grain (product level). The other marts roll up from them via macros, avoiding repeated SQL:
 
-- `daily_agg(group_col)`: `mart_daily_by_cat`, `mart_daily_by_fruit`
-- `monthly_agg(group_col)`: `mart_monthly_by_cat`, `mart_monthly_by_fruit`
+| Macro | Generated marts |
+| --- | --- |
+| `daily_agg(group_col)` | `mart_daily_by_cat`, `mart_daily_by_fruit` |
+| `monthly_agg(group_col)` | `mart_monthly_by_cat`, `mart_monthly_by_fruit` |
 
 <br>
 
