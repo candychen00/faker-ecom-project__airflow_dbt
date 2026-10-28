@@ -17,7 +17,7 @@ env:
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   DOCKER_REPO: candy-private-repo
   DOCKER_TAG: ecom-pj-v1
-  GCP_JOB_NAME: ecom_pj
+  GCP_JOB_NAME: ecom-pj
   GCP_JOB_REGION: us-east1
 
 
