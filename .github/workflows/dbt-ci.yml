@@ -102,7 +102,7 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          cd my_dbt_project
+          cd ecom_dbt_pj
           dbt docs generate
 
 

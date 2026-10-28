@@ -2,9 +2,14 @@
 
 這個 dbt project（`ecom_dbt_pj`）負責把 Airflow 載入 BigQuery 的原始電商資料（客戶、商品、訂單），轉換成可分析的維度表、事實表與報表 mart，並內建資料品質檢查、單元測試與 CI/CD。
 
-- **Warehouse**：BigQuery（`dbt-bigquery`，OAuth 驗證，location `us-east1`）
-- **套件**：`dbt_utils` 1.4.1、`dbt_expectations` 0.10.10
-- **Python 環境管理**：[uv](https://github.com/astral-sh/uv)（Python ≥ 3.12）
+- **Warehouse**：BigQuery
+    - `dbt-bigquery`
+    - OAuth 驗證
+    - location: `us-east1`
+- **Dbt 套件**：
+    - `dbt_utils` 1.4.1
+    - `dbt_expectations` 0.10.10
+- **Python 環境**：uv（Python ≥ 3.12）
 
 ## 整體流程
 
