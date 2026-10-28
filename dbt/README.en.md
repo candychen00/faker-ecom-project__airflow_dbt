@@ -27,24 +27,18 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
 
 ## Model Layers
 
-```
-raw_data.*
-   │
-   ▼
-src_*            view   adds surrogate key (dbt_utils.generate_surrogate_key)
-   │
-   ▼
-int_*            table  removes duplicate rows by surrogate key (row_number = 1)
-   │
-   ▼
-dim_customers    table  splits first_name / last_name
-dim_products     table  builds product = fruit + category
-fct_orders       incremental (merge)  joins orders to product prices, computes order_amt
-   │
-   ▼
-mart_daily_by_{prod,cat,fruit}      table  daily quantity / sales
-mart_monthly_by_{prod,cat,fruit}    table  monthly quantity / sales
-```
+| Step | Model | Materialization | Description |
+|------|-------|-----------------|-------------|
+| 1 | `raw_data.*` | – | Source data in the BigQuery `raw_data` dataset |
+| 2 | `src_*` | view | Adds surrogate key (method: `dbt_utils.generate_surrogate_key`) |
+| 3 | `int_*` | table | Removes duplicate rows by surrogate key |
+| 4 | `dim_customers` | table | – |
+| 4 | `dim_products` | table | – |
+| 4 | `fct_orders` | incremental (merge) | Joins orders with `dim_products`, computes `order_amt` |
+| 5 | `mart_daily_by_{prod,cat,fruit}` | table | Daily quantity / sales report |
+| 5 | `mart_monthly_by_{prod,cat,fruit}` | table | Monthly quantity / sales report |
+
+<br><br>
 
 | Layer | Directory | Materialization | Description |
 |------|------|-----------------|------|
@@ -56,6 +50,8 @@ mart_monthly_by_{prod,cat,fruit}    table  monthly quantity / sales
 | Mart | `models/mart/` | table | Aggregates `ord_quantity` and `order_amt` by product / category / fruit, daily or monthly |
 | Data quality | `models/data_quality/` | table | Duplicate monitoring (see below) |
 
+<br>
+
 ### Marts and Macros
 
 `mart_daily_by_prod` / `mart_monthly_by_prod` are the finest grain (product level). The other marts roll up from them via macros, avoiding repeated SQL:
@@ -63,14 +59,20 @@ mart_monthly_by_{prod,cat,fruit}    table  monthly quantity / sales
 - `daily_agg(group_col)`: `mart_daily_by_cat`, `mart_daily_by_fruit`
 - `monthly_agg(group_col)`: `mart_monthly_by_cat`, `mart_monthly_by_fruit`
 
+<br>
+
 ### Data Quality Monitoring
 
 - `dq_dup_count`: compares `COUNT(*) - COUNT(DISTINCT key)` across raw → intermediate → dim/fct to confirm at which layer duplicates are removed, and includes the run time in Taipei time zone.
 - `dq_dup_details`: lists the ids that appear more than once in the three raw tables, along with their counts, to help trace the source.
 
+<br>
+
 ### Snapshots
 
 `snapshots/` records historical changes (SCD Type 2) for `dim_customers` and `dim_products` using the `timestamp` strategy (`updated_at`).
+
+<br><br>
 
 ## Testing
 
@@ -81,6 +83,8 @@ mart_monthly_by_{prod,cat,fruit}    table  monthly quantity / sales
 | dbt_expectations | `models/schema.yml` | Value ranges (`product_id` 0–39, `ord_quantity` / `order_amt` > 0), regex requiring capitalized names / state names |
 | Custom generic test | `tests/generic/` | `concat_two_strings`: verifies derived columns (`full_name`, `product`) equal the concatenation of their source columns |
 | Unit test | `models/unit_tests.yml` | Verifies the `int_*` deduplication logic, `dim_products` product construction, and `dim_customers` name splitting |
+
+<br><br>
 
 ## Project Structure
 
@@ -98,6 +102,8 @@ dbt/
     ├── snapshots/
     └── tests/generic/
 ```
+
+<br><br>
 
 ## Running Locally
 
@@ -119,6 +125,8 @@ uv run dbt docs generate && uv run dbt docs serve
 ```
 
 > `threads: 1`; BigQuery datasets: `dev` (default) and `ci`.
+
+<br><br>
 
 ## CI/CD
 
