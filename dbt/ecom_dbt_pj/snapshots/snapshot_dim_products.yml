@@ -1,0 +1,7 @@
+snapshots:
+  - name: snapshot_dim_products
+    relation: ref('dim_products')
+    config:
+      unique_key: product_id
+      strategy: timestamp
+      updated_at: updated_at

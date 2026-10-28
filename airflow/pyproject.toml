@@ -14,5 +14,6 @@ dev = [
     "apache-airflow==3.3.2",
     "pandas>=3.0.6",
     "psycopg[binary]>=3.3.6",
+    "pyarrow>=26.0.0",
     "sqlalchemy>=2.1.5",
 ]

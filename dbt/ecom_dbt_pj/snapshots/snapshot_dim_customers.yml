@@ -1,0 +1,7 @@
+snapshots:
+  - name: snapshot_dim_customers
+    relation: ref('dim_customers')
+    config:
+      unique_key: customer_id
+      strategy: timestamp
+      updated_at: updated_at

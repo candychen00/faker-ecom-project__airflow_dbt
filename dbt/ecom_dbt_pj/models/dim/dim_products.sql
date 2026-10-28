@@ -1,6 +1,13 @@
 
-with raw_prod as (
-    select * from {{ ref("src_products") }}
+{{ 
+    config(
+        tags= ["prod"]
+    ) 
+}}
+
+
+with source as (
+    select * from {{ ref("int_products") }}
 )
 
 select
@@ -9,6 +16,8 @@ select
     CONCAT(fruit, ' ', category) as product,
     category as prod_category,
     fruit as prod_fruit,
-    cast(price as numeric) as unit_price
+    price as unit_price,
+    updated_at,
+    created_at
 
-from raw_prod
+from source

@@ -35,6 +35,8 @@ models:
     # Config indicated by + and applies to all files under models/example/
     src:
       +materialized: view
+    intermediate:
+      +materialized: table
     dim:
       +materialized: table
     fct:
@@ -43,3 +45,7 @@ models:
       +materialized: table
     data_quality:
       +materialized: table
+
+
+vars:
+  unittest_uuid: "c56a4180-65aa-42ec-a945-5fd21dec0538"

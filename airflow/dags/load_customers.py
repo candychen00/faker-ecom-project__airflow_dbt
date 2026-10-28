@@ -63,11 +63,19 @@ def load_customers():
 
             # convert dict -> df
             df = pd.DataFrame(cust_list["valid_list"])
+            
+            # signup_date: str -> date, so parquet writes DATE (INT32) not BYTE_ARRAY
+            df["signup_date"] = pd.to_datetime(df["signup_date"]).dt.date
 
-            # convert dict -> csv
+            # tz-naive so parquet writes DATETIME-compatible timestamps
+            now = pd.Timestamp.now(tz="Asia/Taipei").tz_localize(None)
+            df["updated_at"] = now
+            df["created_at"] = now
+
+            # convert dict -> parquet
             # save to tmp
-            output_file = tmp_dir / "customers.csv"
-            df.to_csv(output_file, index=False, header=True)
+            output_file = tmp_dir / "customers.parquet"
+            df.to_parquet(output_file, index=False, engine="pyarrow")
             print("Saved data to tmp folder.")
         else:
             print("Customers valid list is empty. Save nothing to temp folder")
@@ -78,11 +86,11 @@ def load_customers():
         gcp_conn_id= "google_cloud_default",
 
         # local
-        src= "/tmp/customers.csv",
+        src= "/tmp/customers.parquet",
 
         # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        dst= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/customers_{{ logical_date.in_timezone('Asia/Taipei').strftime('%Y%m%dT%H%M%S') }}.csv",  
+        dst= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/customers_{{ logical_date.in_timezone('Asia/Taipei').strftime('%Y%m%dT%H%M%S') }}.parquet",  
     )
 
     create_bq_dataset = BigQueryCreateEmptyDatasetOperator(
@@ -102,14 +110,23 @@ def load_customers():
 
         # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        source_objects= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/*.csv",
-        source_format="CSV",
+        source_objects= "customers/date={{ logical_date.in_timezone('Asia/Taipei').strftime('%Y-%m-%d') }}/*.parquet",
+        source_format="PARQUET",
 
         # bq
         destination_project_dataset_table= "raw_data.raw_customers",
         location= "us-east1",
-        autodetect= True,
         write_disposition="WRITE_APPEND",
+        autodetect=False,
+        schema_fields=[
+            {"name": "customer_id", "type": "STRING", "mode": "REQUIRED"},
+            {"name": "name", "type": "STRING", "mode": "REQUIRED"},
+            {"name": "state", "type": "STRING", "mode": "REQUIRED"},
+            {"name": "email", "type": "STRING", "mode": "REQUIRED"},
+            {"name": "signup_date", "type": "DATE", "mode": "REQUIRED"},
+            {"name": "updated_at", "type": "DATETIME", "mode": "REQUIRED"},
+            {"name": "created_at", "type": "DATETIME", "mode": "REQUIRED"},
+        ],
     )
 
 

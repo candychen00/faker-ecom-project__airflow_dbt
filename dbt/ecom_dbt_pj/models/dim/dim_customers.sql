@@ -1,5 +1,12 @@
-with src_cust as (
-    select * from {{ ref('src_customers') }}
+
+{{ 
+    config(
+        tags= ["cust"]
+    ) 
+}}
+
+with source as (
+    select * from {{ ref('int_customers') }}
 )
 
 select
@@ -10,6 +17,8 @@ select
     SPLIT(name, ' ')[SAFE_OFFSET(1)] AS last_name,
     email,
     state,
-    signup_date
+    signup_date,
+    updated_at,
+    created_at
     
-from src_cust
+from source

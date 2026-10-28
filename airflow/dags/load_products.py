@@ -10,6 +10,8 @@ from sqlalchemy import create_engine, MetaData, Table, Column, text
 from sqlalchemy.dialects.postgresql import SMALLINT, VARCHAR, NUMERIC
 
 import pandas as pd     #type:ignore
+import pyarrow as pa        #type:ignore
+import pyarrow.parquet as pq        #type:ignore
 from pandas.testing import assert_frame_equal       #type:ignore
 from pytests.test_load_products.complete_prod_data import prod_data       #type:ignore
 
@@ -19,6 +21,7 @@ from dotenv import load_dotenv
 from pprint import pprint
 from pathlib import Path
 import json
+from decimal import Decimal
 
 
 
@@ -132,12 +135,29 @@ def load_products():
 
         # convert dict -> df
         df = pd.DataFrame(data)
+        # tz-naive so parquet writes DATETIME-compatible timestamps
+        now = pd.Timestamp.now(tz="Asia/Taipei").tz_localize(None)
+        df["updated_at"] = now
+        df["created_at"] = now
+        df[["created_at", "updated_at"]] = df[["created_at", "updated_at"]].astype("datetime64[us]")
+        # XCom JSON turns Decimal into float; pyarrow needs Decimal objects for decimal128
+        df["price"] = df["price"].apply(lambda x: Decimal(str(x)).quantize(Decimal("0.01")))
 
-        # convert df -> csv
-        # save csv to tmp
-        output_file = output_path / "products.csv"
-        df.to_csv(output_file, mode="w", index=False)
-        print("Saved data to tmp folder.")
+        # convert df -> parquet
+        # save parquet to tmp
+        output_file = output_path / "products.parquet"
+        
+        # price must be a parquet DECIMAL (not DOUBLE) to load into a BQ NUMERIC column
+        schema = pa.schema([
+            ("product_id", pa.int64()),
+            ("fruit", pa.string()),
+            ("category", pa.string()),
+            ("price", pa.decimal128(8, 2)),      # → NUMERIC
+            ("created_at", pa.timestamp("us")),  # → DATETIME
+            ("updated_at", pa.timestamp("us")),  # → DATETIME
+        ])
+        table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
+        pq.write_table(table, output_file, compression="snappy")
 
 
     upload_to_gcs = LocalFilesystemToGCSOperator(
@@ -145,11 +165,11 @@ def load_products():
         gcp_conn_id="google_cloud_default",
 
         # local
-        src= "/tmp/products.csv",
+        src= "/tmp/products.parquet",
 
         # gsc
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        dst= "products/products.csv",
+        dst= "products/products.parquet",
     )
 
 
@@ -159,15 +179,23 @@ def load_products():
 
         # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        source_objects = "products/products.csv",
-        source_format= "CSV",
+        source_objects = "products/products.parquet",
+        source_format= "PARQUET",
 
         # bq
         destination_project_dataset_table= "raw_data.raw_products",
         create_disposition= "CREATE_IF_NEEDED",
         write_disposition= "WRITE_TRUNCATE",
         location= "us-east1",
-        autodetect= True,
+        schema_fields=[
+            { "name": "product_id", "type": "INTEGER", "mode": "REQUIRED"},
+            { "name": "fruit", "type": "STRING", "mode": "REQUIRED"},
+            { "name": "category", "type": "STRING", "mode": "REQUIRED"},
+            { "name": "price", "type": "NUMERIC", "mode": "REQUIRED"},
+            { "name": "updated_at", "type": "DATETIME", "mode": "REQUIRED"},
+            { "name": "created_at", "type": "DATETIME", "mode": "REQUIRED"},
+        ],
+        autodetect= False,
     )
         
 

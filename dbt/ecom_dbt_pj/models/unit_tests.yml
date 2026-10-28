@@ -1,29 +1,74 @@
 
 unit_tests:
 
-  - name: unittest_src_products_dedup
-    model: src_products
+  - name: unittest__int_products__dedup
+    model: int_products
     given:
-      - input: source('ecom_raw', 'products')
+      - input: ref('src_products')
         format: dict
         rows:
-          - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
-          - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+        - { product_sk: "{{ var('unittest_uuid')}}", fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+        - { product_sk: "{{ var('unittest_uuid')}}", fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
     expect:
       format: dict
       rows: 
-        - { fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
+        - { product_sk: "{{ var('unittest_uuid')}}", fruit: "Apple", price: 13.89, category: "Juice", product_id: 0 }
 
 
-  - name: unittest_src_customers_dedup
-    model: src_customers
+  - name: unittest__int_customers__dedup
+    model: int_customers
     given:
-      - input: source('ecom_raw', 'customers')
+      - input: ref('src_customers')
         format: dict
         rows:
-          - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
-          - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
+          - { customer_sk: "{{ var('unittest_uuid')}}", name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "{{ var('unittest_uuid')}}", signup_date: "2026-01-01" }
+          - { customer_sk: "{{ var('unittest_uuid')}}", name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "{{ var('unittest_uuid')}}", signup_date: "2026-01-01" }
+
     expect:
       format: dict
       rows:
-        - { name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "c56a4180-65aa-42ec-a945-5fd21dec0538", signup_date: "2026-01-01" }
+        - { customer_sk: "{{ var('unittest_uuid')}}", name: "Candy Chen", email: "candy@gmail.com", state: "Taipei", customer_id: "{{ var('unittest_uuid')}}", signup_date: "2026-01-01" }
+
+
+  - name: unittest__int_orders__dedup
+    model: int_orders
+    given:
+      - input: ref('src_orders')
+        format: dict
+        rows:
+          - { order_sk: "{{ var('unittest_uuid')}}", order_at: "2026-10-18 02:19:03 UTC", order_id: "{{ var('unittest_uuid')}}", quantity: 1, product_id: 1, customer_id: "{{ var('unittest_uuid')}}"  }
+          - { order_sk: "{{ var('unittest_uuid')}}", order_at: "2026-10-18 02:19:03 UTC", order_id: "{{ var('unittest_uuid')}}", quantity: 1, product_id: 1, customer_id: "{{ var('unittest_uuid')}}"  }
+
+    expect:
+      format: dict
+      rows:
+        - { order_sk: "{{ var('unittest_uuid')}}", order_at: "2026-10-18 02:19:03 UTC", order_id: "{{ var('unittest_uuid')}}", quantity: 1, product_id: 1, customer_id: "{{ var('unittest_uuid')}}"  }
+
+
+  - name: unittest__dim_products__concat_product
+    model: dim_products
+    given:
+      - input: ref('int_products')
+        format: dict
+        rows:
+          - { fruit: "Apple", category: "Juice" }
+    expect:
+      format: dict
+      rows:
+        - { product: "Apple Juice" }
+
+
+  - name: unittest__dim_customers__split_fullname
+    model: dim_customers
+    given: 
+      - input: ref('int_customers')
+        format: dict
+        rows:
+          - { name: "Candy Chen" }
+    expect:
+      format: dict
+      rows:
+        - { first_name: "Candy", last_name: "Chen" }
+
+
+

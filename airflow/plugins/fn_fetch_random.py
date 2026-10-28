@@ -26,5 +26,9 @@ def fetch_random_rows(bq_table: str, num_records: int) -> list[dict]:
     # fetch random records
     df_rand = df.sample(num_records)
 
+    # XCom can't serialize pandas.Timestamp, so cast datetime columns to str
+    datetime_cols = df_rand.select_dtypes(include=["datetime", "datetimetz"]).columns
+    df_rand[datetime_cols] = df_rand[datetime_cols].astype(str)
+
     # convert df -> dict
     return df_rand.to_dict(orient="records")

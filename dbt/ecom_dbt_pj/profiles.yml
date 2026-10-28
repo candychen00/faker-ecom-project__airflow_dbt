@@ -1,12 +1,25 @@
 ecom_dbt_pj:
-  target: dev
+  target: dev # default target
   outputs:
     dev:
       type: bigquery
-      method: service-account
+      method: oauth
+      #method: service-account
       project: "{{ env_var('GCP_PROJECT_ID') }}"
-      keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
+      #keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
       dataset: dev
+      location: us-east1
+      threads: 1
+      timeout_seconds: 300
+      priority: interactive
+
+    ci:
+      type: bigquery
+      method: oauth
+      #method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      #keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
+      dataset: ci
       location: us-east1
       threads: 1
       timeout_seconds: 300

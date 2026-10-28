@@ -53,6 +53,7 @@ def load_orders():
         rand_prod = ctx["ti"].xcom_pull(task_ids="random_prod")
         run_date_start = ctx["logical_date"].in_timezone("Asia/Taipei").start_of("day")
         run_date_end = ctx["logical_date"].in_timezone("Asia/Taipei").end_of("day")
+        run_time = ctx["logical_date"].in_timezone("Asia/Taipei").strftime("%Y-%m-%dT%H:%M:%S")
 
         print(f"run_date_start: {run_date_start}")
         print(f"run_date_end: {run_date_end}")
@@ -65,7 +66,7 @@ def load_orders():
             one_prod_id = random.choice(rand_prod)["product_id"]
 
             orders.append({
-                "order_id": uuid4(),
+                "order_id": str(uuid4()),
                 "customer_id": one_cust_id,
                 "product_id": one_prod_id,
                 "quantity": random.randint(1,20),
@@ -73,6 +74,8 @@ def load_orders():
                         datetime_start= run_date_start, 
                         datetime_end= run_date_end, 
                         tzinfo=ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%dT%H:%M:%S"),
+                "created_at": run_time,
+                "updated_at": run_time
             })
 
         pprint(orders)
@@ -88,9 +91,18 @@ def load_orders():
         # convert list[dict] -> dataframe
         df = pd.DataFrame(data)
 
-        # convert to csv, and save to /tmp
-        output_file = output_path / "orders.csv"
-        df.to_csv(output_file, index=False)
+        # tz-naive so parquet writes DATETIME-compatible timestamps
+        now = pd.Timestamp.now(tz="Asia/Taipei").tz_localize(None)
+        # order_at is a string from generate_orders; parquet needs a real timestamp for BQ DATETIME
+        df["order_at"] = pd.to_datetime(df["order_at"])
+        df["updated_at"] = now
+        df["created_at"] = now
+
+        # convert dict -> parquet
+        # save to tmp
+        output_file = output_path / "orders.parquet"
+        df.to_parquet(output_file, index=False, engine="pyarrow")
+        print("Saved data to tmp folder.")
 
 
     upload_to_gcs = LocalFilesystemToGCSOperator(
@@ -98,11 +110,11 @@ def load_orders():
         gcp_conn_id="google_cloud_default",
 
         # local
-        src= "/tmp/orders.csv",
+        src= "/tmp/orders.parquet",
 
         # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME,
-        dst= 'orders/date={{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}/orders_{{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}.csv'
+        dst= 'orders/date={{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}/orders_{{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}.parquet'
     )
 
 
@@ -112,8 +124,8 @@ def load_orders():
 
         # gcs
         bucket= GCP_CLOUD_STORAGE_BUCKET_NAME, 
-        source_objects= 'orders/date={{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}/orders_{{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}.csv',
-        source_format= "CSV",
+        source_objects= 'orders/date={{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}/orders_{{ logical_date.in_timezone("Asia/Taipei").strftime("%Y-%m-%d") }}.parquet',
+        source_format= "PARQUET",
 
         # bq
         destination_project_dataset_table= "raw_data.raw_orders",
@@ -121,6 +133,15 @@ def load_orders():
         write_disposition= "WRITE_APPEND",
         location= "us-east1",
         autodetect= True,
+        schema_fields=[
+            { "name": "order_id", "type": "STRING", "mode": "REQUIRED"},
+            { "name": "customer_id", "type": "STRING", "mode": "REQUIRED"},
+            { "name": "product_id", "type": "INTEGER", "mode": "REQUIRED"},
+            { "name": "quantity", "type": "INTEGER", "mode": "REQUIRED"},
+            { "name": "order_at", "type": "DATETIME", "mode": "REQUIRED"},
+            { "name": "updated_at", "type": "DATETIME", "mode": "REQUIRED"},
+            { "name": "created_at", "type": "DATETIME", "mode": "REQUIRED"},
+        ],
     )
     
 

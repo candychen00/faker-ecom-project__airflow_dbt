@@ -1,12 +1,17 @@
 
-WITH
-dedup as (
-    select distinct * 
-    from {{ source('ecom_raw', 'customers') }}
+{{ 
+    config(
+        tags= ["cust"]
+    ) 
+}}
+
+with source as (
+    select * from {{ source('ecom_raw', 'customers' ) }}
 )
 
-SELECT
+select
     {{ dbt_utils.generate_surrogate_key(['customer_id', 'name', 'email', 'state', 'signup_date']) }} as customer_sk,
     *
-FROM dedup
+from source
+order by customer_sk
 

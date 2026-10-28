@@ -54,6 +54,16 @@ models:
         data_tests:
           - not_null
 
+      - name: updated_at
+        data_type: datetime
+        data_tests:
+          - not_null 
+
+      - name: created_at
+        data_type: datetime
+        data_tests:
+          - not_null 
+
 
 
   - name: dim_customers
@@ -121,6 +131,16 @@ models:
         data_tests:
           - not_null
 
+      - name: updated_at
+        data_type: datetime
+        data_tests:
+          - not_null 
+
+      - name: created_at
+        data_type: datetime
+        data_tests:
+          - not_null 
+
 
 
   - name: fct_orders
@@ -128,12 +148,6 @@ models:
       contract:
         enforced: true
     columns:
-
-      - name: order_row_num
-        data_type: integer
-        data_tests:
-          - not_null
-          - unique
 
       - name: order_sk
         data_type: string(50)
@@ -188,4 +202,14 @@ models:
               arguments:
                 min_value: 0
                 strictly: true # > 0, not equals to zero
+
+      - name: updated_at
+        data_type: datetime
+        data_tests:
+          - not_null  
+
+      - name: created_at
+        data_type: datetime
+        data_tests:
+          - not_null  
 

@@ -1,11 +1,16 @@
 
-WITH
-dedup as (
-    select distinct *
-    from {{ source('ecom_raw', 'products') }}
+{{ 
+    config(
+        tags= ["prod"]
+    ) 
+}}
+
+with source as (
+    select * from {{ source('ecom_raw', 'products') }}
 )
 
-SELECT
-    {{ dbt_utils.generate_surrogate_key(['product_id', 'price', 'fruit', 'category']) }} as product_sk,
+select
+    {{ dbt_utils.generate_surrogate_key(['fruit', 'category', 'product_id', 'price']) }} as product_sk,
     *
-FROM dedup
+from source
+order by product_sk
