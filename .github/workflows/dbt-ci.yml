@@ -66,13 +66,18 @@ jobs:
           uv run dbt parse # check if there's jinja or yml errors
 
 
-      - name: Compile DBT models 
+      - name: Compile DBT models  # generate SQLs
         run: |
           cd ecom_dbt_pj
-          uv run dbt compile --target ci # generate SQLs
+          uv run dbt compile --target ci 
 
 
-      - name: Build DBT models and run tests
+      - name: Build DBT models and run tests # run, test, snapshot, seed
         run: |
           cd ecom_dbt_pj
-          uv run dbt build --target ci # run, test, snapshot, seed
+          uv run dbt build --target ci 
+
+
+      - name: Delete ci dataset
+        run: | 
+          bq rm -r -f -d ${{ secrets.GCP_PROJECT }}:ci
