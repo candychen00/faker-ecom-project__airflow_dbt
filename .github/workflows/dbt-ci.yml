@@ -113,7 +113,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'ecom_dbt_pj/target' # dbt docs generate 會將產物放在 target/ 目錄
+          path: 'dbt/ecom_dbt_pj/target' # dbt docs generate 會將產物放在 target/ 目錄 (uses 步驟不受 working-directory 影響，需從 repo root 起算)
 
 
       - name: Deploy to GitHub Pages

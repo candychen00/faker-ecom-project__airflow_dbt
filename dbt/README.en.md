@@ -11,7 +11,7 @@ This dbt project (`ecom_dbt_pj`) transforms the raw e-commerce data (customers, 
     - `dbt_expectations` 0.10.10
 - **Python environment**: uv **(Python ≥ 3.12)**
 
-<br>
+<br><br>
 
 ## Overall Flow
 
@@ -24,6 +24,8 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
                                                                      ├─ mart         (aggregated reports)
                                                                      └─ data_quality (duplicate checks)
 ```
+
+<br><br>
 
 ## Model Layers
 
@@ -40,12 +42,14 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
 
 <br><br>
 
+## Directory Layers
+
 | Layer | Directory | Materialization | Description |
 |------|------|-----------------|------|
-| Source | `models/sources.yml` | – | `ecom_raw` maps to BigQuery `raw_data` tables `raw_customers` / `raw_products` / `raw_orders`; the project is set via the `GCP_PROJECT_ID` environment variable |
-| Staging | `models/src/` | view | Generates a `*_sk` surrogate key for each record and keeps the original columns |
-| Intermediate | `models/intermediate/` | table | Deduplicates by `*_sk` (the raw layer may contain duplicates from repeated loads) |
-| Dimension | `models/dim/` | table | `dim_customers`, `dim_products`, with `created_at` / `updated_at` |
+| Raw | `models/sources.yml` | – | `ecom_raw` maps to BigQuery `raw_data` dataset tables: `raw_customers` / `raw_products` / `raw_orders` |
+| Source | `models/src/` | view | Generates a `*_sk` surrogate key for each record and keeps the original columns |
+| Intermediate | `models/intermediate/` | table | Deduplicates by `*_sk` (the raw and source layers may contain duplicates) |
+| Dimension | `models/dim/` | table | `dim_customers` and `dim_products`, with cleaned data |
 | Fact | `models/fct/` | incremental | `fct_orders`: `merge` strategy, `unique_key = order_id`, `on_schema_change = fail`; incremental runs only process rows whose `updated_at` is within 3 hours before the current maximum, to cover late-arriving data |
 | Mart | `models/mart/` | table | Aggregates `ord_quantity` and `order_amt` by product / category / fruit, daily or monthly |
 | Data quality | `models/data_quality/` | table | Duplicate monitoring (see below) |
