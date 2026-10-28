@@ -88,7 +88,7 @@ Tables checked by `dq_dup_count`:
 
 ### Snapshots
 
-`snapshots/` records historical changes (SCD Type 2) for `dim_customers` and `dim_products` using the `timestamp` strategy (`updated_at`).
+`snapshots/` records historical changes (SCD Type 2) for `dim_customers` and `dim_products` using the `timestamp` strategy (with `updated_at` field).
 
 <br><br>
 
@@ -96,11 +96,11 @@ Tables checked by `dq_dup_count`:
 
 | Type | Location | Content |
 |------|------|------|
-| Contract | `models/schema.yml` | `contract.enforced` is enabled on `dim_products`, `dim_customers`, and `fct_orders`, fixing column types |
-| Generic test | `models/schema.yml` | `not_null`, `unique`, `accepted_values` (category, fruit), `relationships` (`fct_orders` → the two dims) |
-| dbt_expectations | `models/schema.yml` | Value ranges (`product_id` 0–39, `ord_quantity` / `order_amt` > 0), regex requiring capitalized names / state names |
-| Custom generic test | `tests/generic/` | `concat_two_strings`: verifies derived columns (`full_name`, `product`) equal the concatenation of their source columns |
-| Unit test | `models/unit_tests.yml` | Verifies the `int_*` deduplication logic, `dim_products` product construction, and `dim_customers` name splitting |
+| Contract | `models/schema.yml` | • `contract.enforced` is enabled on `dim_products`, `dim_customers`, and `fct_orders`<br>• Fixes column types |
+| Generic test | `models/schema.yml` | • `not_null`<br>• `unique`<br>• `accepted_values` (category, fruit)<br>• `relationships` (`fct_orders` → the two dims) |
+| dbt_expectations | `models/schema.yml` | • Value ranges: `product_id` 0–39, `ord_quantity` / `order_amt` > 0<br>• Regex requiring capitalized names / state names |
+| Custom generic test | `tests/generic/` | • `concat_two_strings`<br>• Verifies derived columns (`full_name`, `product`) equal the concatenation of their source columns |
+| Unit test | `models/unit_tests.yml` | • Verifies the `int_*` deduplication logic<br>• Verifies `dim_products` product construction<br>• Verifies `dim_customers` name splitting |
 
 <br><br>
 

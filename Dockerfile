@@ -6,7 +6,8 @@ WORKDIR /app/dbt
 
 # install deps first so this layer is cached unless the lockfile changes
 COPY dbt/pyproject.toml dbt/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project --no-cache \
+    && find .venv -type d -name __pycache__ -prune -exec rm -rf {} +
 
 COPY dbt/ ./
 

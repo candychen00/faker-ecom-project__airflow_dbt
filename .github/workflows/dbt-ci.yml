@@ -157,8 +157,8 @@ jobs:
 
       - name: Build docker image
         run: |
-          docker build --platform linux/amd64 -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }} .
-          docker build --platform linux/amd64 -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:latest .
+          IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}
+          docker build --platform linux/amd64 -t $IMAGE:${{ env.GAR_TAG }} -t $IMAGE:latest .
 
 
       - name: Push docker image
