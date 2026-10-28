@@ -1,5 +1,5 @@
 
-name: dbt CI
+name: dbt CI/CD
 
 on:
   push:
@@ -8,8 +8,22 @@ on:
       - "dbt/**"
       - ".github/workflows/dbt-ci.yml"
 
+  workflow_dispatch:
+
+env:
+  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  DOCKER_REPO: candy-private-repo
+  DOCKER_TAG: ecom-pj-v1
+  GCP_JOB_NAME: ecom_pj
+  GCP_JOB_REGION: us-east1
+
+
 jobs:
-  push-and-test:
+  dbt-ci:
+    name: dbt-run-and-test
     runs-on: ubuntu-latest
 
     defaults:
@@ -17,7 +31,7 @@ jobs:
         working-directory: dbt
 
     env:
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_ID: ${{ env.GCP_PROJECT_ID }}
 
     permissions:
       contents: 'read'
@@ -47,7 +61,7 @@ jobs:
       - name: Authenticate Google Acc
         uses: 'google-github-actions/auth@v3'
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ env.GCP_SA_KEY }}
 
 
       - name: 'Set up Google Cloud SDK'
@@ -79,5 +93,63 @@ jobs:
 
 
       - name: Delete ci dataset
+        if: always()
         run: | 
-          bq rm -r -f -d ${{ secrets.GCP_PROJECT }}:ci
+          bq rm -r -f -d ${{ env.GCP_PROJECT_ID }}:ci
+
+
+
+
+  dbt-cd:
+    name: build-docker-image
+    needs: dbt-ci # dbt-ci 成功後才會執行
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: "dbt/pyproject.toml"
+
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+
+
+      - name: Install python Packages
+        run: |
+          uv sync --frozen
+
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+
+      - name: Build and push docker image
+        run: |
+          docker build --platform linux/amd64 -t ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ env.DOCKER_TAG }} .
+          docker push ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ env.DOCKER_TAG }}
+
+
+      - name: Authenticate Google Acc
+        uses: 'google-github-actions/auth@v3'
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+
+      - name: 'Set up Google Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v3'
+
+
+      - name: Deploy to Cloud Run Job
+        run: |
+          gcloud run jobs update ${{ env.GCP_JOB_NAME }} \
+            --region ${{ env.GCP_REGION }}
+            --image ${{ env.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ env.DOCKER_TAG }}
