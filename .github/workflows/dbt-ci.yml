@@ -98,6 +98,29 @@ jobs:
           bq rm -r -f -d ${{ env.GCP_PROJECT_ID }}:ci
 
 
+      - name: Generate dbt Docs
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          cd my_dbt_project
+          dbt docs generate
+
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'ecom_dbt_pj/target' # dbt docs generate 會將產物放在 target/ 目錄
+
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
 
 
   dbt-cd:
@@ -141,9 +164,12 @@ jobs:
       - name: 'Set up Google Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v3'
 
-
+          
       - name: Deploy to Cloud Run Job
         run: |
-          gcloud run jobs update ${{ env.GCP_JOB_NAME }} \
-            --region ${{ env.GCP_REGION }} \
-            --image ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
+          IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
+          if gcloud run jobs describe ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} >/dev/null 2>&1; then
+            gcloud run jobs update ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} --image $IMAGE
+          else
+            gcloud run jobs create ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} --image $IMAGE
+          fi
