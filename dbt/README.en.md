@@ -96,10 +96,10 @@ Tables checked by `dq_dup_count`:
 
 | Type | Location | Content |
 |------|------|------|
-| Contract | `models/schema.yml` | • `contract.enforced` is enabled on `dim_products`, `dim_customers`, and `fct_orders`<br>• Fixes column types |
-| Generic test | `models/schema.yml` | • `not_null`<br>• `unique`<br>• `accepted_values` (category, fruit)<br>• `relationships` (`fct_orders` → the two dims) |
-| dbt_expectations | `models/schema.yml` | • Value ranges: `product_id` 0–39, `ord_quantity` / `order_amt` > 0<br>• Regex requiring capitalized names / state names |
-| Custom generic test | `tests/generic/` | • `concat_two_strings`<br>• Verifies derived columns (`full_name`, `product`) equal the concatenation of their source columns |
+| Contract | `models/schema.yml` | • `contract.enforced` is enabled on `dim_products`, `dim_customers`, and `fct_orders`<br>• Assign column types |
+| Generic test | `models/schema.yml` | • `not_null`<br>• `unique`<br>• `accepted_values` (for category, fruit fields)<br>• `relationships` (`fct_orders` <> `dim_products` `dim_customers`) |
+| dbt_expectations | `models/schema.yml` | • Value ranges: `product_id` 0–39<br>• `ord_quantity` / `order_amt` > 0<br>• Regex requiring capitalized customer names and state names |
+| Custom generic test | `tests/generic/` | • `concat_two_strings`  verifies `product` is the concatenation of their source columns |
 | Unit test | `models/unit_tests.yml` | • Verifies the `int_*` deduplication logic<br>• Verifies `dim_products` product construction<br>• Verifies `dim_customers` name splitting |
 
 <br><br>

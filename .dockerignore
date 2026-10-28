@@ -1,0 +1,10 @@
+**/.venv
+**/__pycache__
+**/logs
+**/target
+**/dbt_packages
+**/secret
+**/.env
+**/gcp-key.json
+.git
+airflow
