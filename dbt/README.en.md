@@ -1,6 +1,6 @@
-# dbt – Fruit E-commerce Data Warehouse
+# E-commerce Project - DBT Pipeline
 
-This dbt project (`ecom_dbt_pj`) transforms the raw e-commerce data (customers, products, orders) that Airflow loads into BigQuery into analysis-ready dimension tables, fact tables, and reporting marts. It includes built-in data quality checks, unit tests, and CI/CD.
+This dbt project (`ecom_dbt_pj`) transforms the raw e-commerce data (customers, products, orders) that Airflow loads into BigQuery into analysis-ready dimension tables, fact tables, and reporting marts. It includes built-in dbt data quality checks, unit tests, and CI/CD.
 
 - **Warehouse**: BigQuery
     - `dbt-bigquery`
@@ -9,24 +9,26 @@ This dbt project (`ecom_dbt_pj`) transforms the raw e-commerce data (customers, 
 - **dbt packages**:
     - `dbt_utils` 1.4.1
     - `dbt_expectations` 0.10.10
-- **Python environment**: uv (Python ≥ 3.12)
+- **Python environment**: uv **(Python ≥ 3.12)**
+
+<br>
 
 ## Overall Flow
 
 ```
-Faker generates data ──► Airflow DAG ──► BigQuery raw_data ──► dbt ──► dev / ci dataset
-(airflow/)               (load_*.py)     raw_customers            │
-                                         raw_products             ├─ src          (view)
-                                         raw_orders               ├─ intermediate (deduplication)
-                                                                  ├─ dim / fct    (dimensions, facts)
-                                                                  ├─ mart         (aggregated reports)
-                                                                  └─ data_quality (duplicate checks)
+Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ──► dbt models ──► dev / ci bigquery datasets
+(airflow/)                  (load_*.py)      raw_customers           │
+                                             raw_products            |─ src          (view)
+                                             raw_orders              ├─ intermediate (deduplication)
+                                                                     ├─ dim / fct    (dimensions, facts)
+                                                                     ├─ mart         (aggregated reports)
+                                                                     └─ data_quality (duplicate checks)
 ```
 
 ## Model Layers
 
 ```
-raw_data.* (source: ecom_raw)
+raw_data.*
    │
    ▼
 src_*            view   adds surrogate key (dbt_utils.generate_surrogate_key)
