@@ -45,13 +45,21 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v3'
 
       - name: Install DBT packages
-        run: uv run dbt deps
+        run: 
+          cd ecom_dbt_pj
+          uv run dbt deps
 
       - name: Parse DBT project 
-        run: uv run dbt parse # check if there's jinja or yml errors
+        run: 
+          cd ecom_dbt_pj
+          uv run dbt parse # check if there's jinja or yml errors
 
       - name: Compile DBT models 
-        run: uv run dbt compile --target ci # generate SQLs
+        run: 
+          cd ecom_dbt_pj
+          uv run dbt compile --target ci # generate SQLs
 
       - name: Build DBT models and run tests
-        run: uv run dbt build --target ci # run, test, snapshot, seed
+        run: 
+          cd ecom_dbt_pj
+          uv run dbt build --target ci # run, test, snapshot, seed
