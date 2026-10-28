@@ -69,8 +69,20 @@ Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ─�
 
 ### Data Quality Monitoring
 
-- `dq_dup_count`: compares `COUNT(*) - COUNT(DISTINCT key)` across raw → intermediate → dim/fct to confirm at which layer duplicates are removed, and includes the run time in Taipei time zone.
-- `dq_dup_details`: lists the ids that appear more than once in the three raw tables, along with their counts, to help trace the source.
+| Model | Purpose | Tables checked |
+| --- | --- | --- |
+| `dq_dup_count` | Counts duplicate records in each table | 9 tables (see below) |
+| `dq_dup_details` | Lists the ids that appear more than once in the three raw tables, along with their counts, to help trace the source | `raw_orders`, `raw_customers`, `raw_products` |
+
+<br>
+
+Tables checked by `dq_dup_count`:
+
+| Entity | Key | Raw | Intermediate | Final |
+| --- | --- | --- | --- | --- |
+| Orders | `order_id` | `raw_orders` | `int_orders` | `fct_orders` |
+| Products | `product_id` | `raw_products` | `int_products` | `dim_products` |
+| Customers | `customer_id` | `raw_customers` | `int_customers` | `dim_customers` |
 
 <br>
 
