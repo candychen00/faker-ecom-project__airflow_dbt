@@ -168,6 +168,10 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
 
 
+      - name: Wait for image to be available
+        run: sleep 10
+
+
       - name: Update Cloud Run Job
         run: |
           gcloud run jobs update $GCP_JOB_NAME \
