@@ -22,6 +22,8 @@ env:
   GAR_REPO: ecom-pj
   GAR_IMAGE: dbt-pj
   GAR_TAG: ${{ github.sha }}
+  GAR_IMAGE_URI: us-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ecom-pj/dbt-pj
+
 
   IMAGE_NAME: candychen00/ecom-pj
 
@@ -151,11 +153,23 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v3'
 
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ env.DOCKERHUB_USERNAME }}
+      #     password: ${{ env.DOCKERHUB_TOKEN }}
+
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-east1-docker.pkg.dev
+
+
+      - name: Delete all images in GAR repo
+        run: |
+          REPO_PATH=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}
+          for IMG in $(gcloud artifacts docker images list $REPO_PATH --include-tags --format="value(package)" | sort -u); do
+            gcloud artifacts docker images delete $IMG --delete-tags --quiet
+          done
 
 
       - name: Build and Push Image
@@ -164,8 +178,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.GAR_IMAGE_URI }}:${{ github.sha }}
 
 
       - name: Wait for image to be available
@@ -174,7 +187,7 @@ jobs:
 
       - name: Update Cloud Run Job
         run: |
-          gcloud run jobs update $GCP_JOB_NAME \
-            --image=$IMAGE_NAME:${{ github.sha }} \
-            --region=$GCP_REGION \
-            --project=$GCP_PROJECT_ID
+          gcloud run jobs update "$GCP_JOB_NAME" \
+            --image="$GAR_IMAGE_URI:${{ github.sha }}" \
+            --region="$GCP_REGION" \
+            --project="$GCP_PROJECT_ID"
