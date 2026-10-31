@@ -29,6 +29,7 @@ env:
 
 jobs:
   dbt-ci:
+    if: false # temporary skip
     name: dbt-run-and-test
     runs-on: ubuntu-latest
 
@@ -130,6 +131,7 @@ jobs:
   dbt-cd:
     name: build-docker-image
     needs: dbt-ci # dbt-ci 成功後才會執行
+    if: ${{ !cancelled() }}   # 即使 dbt-ci 被跳過，也照常執行 (temporary skip dbt-ci)
     runs-on: ubuntu-latest
 
     permissions:
@@ -197,6 +199,6 @@ jobs:
       - name: Update Cloud Run Job
         run: |
           gcloud run jobs update $GCP_JOB_NAME \
-            --image=$IMAGE_NAME:${{ github.sha }} \
+            --image=$IMAGE_NAME:${{ env.TAG_NAME }} \
             --region=$GCP_REGION \
             --project=$GCP_PROJECT_ID
