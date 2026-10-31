@@ -24,7 +24,7 @@ env:
   GAR_TAG: ${{ github.sha }}
 
   IMAGE_NAME: candychen00/ecom-pj
-  TAG_NAME: test
+  TAG_NAME: ecom-dbt-pj
 
 
 jobs:
@@ -145,19 +145,11 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v3'
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }} # Your service account key stored in GitHub Secrets
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
 
-      # - name: Configure Docker for Artifact Registry
-      #   run: gcloud auth configure-docker us-east1-docker.pkg.dev
-
-
-      # - name: Delete all images in GAR repo
-      #   run: |
-      #     REPO_PATH=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}
-      #     for IMG in $(gcloud artifacts docker images list $REPO_PATH --include-tags --format="value(package)" | sort -u); do
-      #       gcloud artifacts docker images delete $IMG --delete-tags --quiet
-      #     done
+      - name: 'Set up Google Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v3'
 
 
       - name: Login to Docker Hub
@@ -175,25 +167,6 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}
             ${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-
-
-      # - name: Build docker image
-      #   run: |
-      #     IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}
-      #     docker build --platform linux/amd64 -t $IMAGE:${{ env.GAR_TAG }} -t $IMAGE:latest .
-
-
-      # - name: Push docker image
-      #   run: |
-      #     docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
-      #     docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:latest
-
-
-      - name: 'Set up Google Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v3'
 
 
       - name: Update Cloud Run Job
