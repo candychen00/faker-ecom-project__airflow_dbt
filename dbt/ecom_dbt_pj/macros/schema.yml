@@ -1,0 +1,23 @@
+version: 2
+
+macros:
+
+  - name: daily_agg
+    description: |
+      - Rolls up `mart_daily_by_prod` to one row per `order_date` and `group_col`
+      - Sums `ord_quantity` and `order_amt` (rounded to 2 decimals)
+      - Used by mart_daily_by_fruit and mart_daily_by_cat
+    arguments:
+      - name: group_col
+        type: string
+        description: Column from mart_daily_by_prod to group by (e.g. `prod_fruit`, `prod_category`)
+
+  - name: monthly_agg
+    description: |
+      - Rolls up `mart_monthly_by_prod` to one row per `year_month` and `group_col`
+      - Sums `ord_quantity` and `order_amt` (rounded to 2 decimals)
+      - Used by mart_monthly_by_fruit and mart_monthly_by_cat
+    arguments:
+      - name: group_col
+        type: string
+        description: Column from mart_monthly_by_prod to group by (e.g. `prod_fruit`, `prod_category`)

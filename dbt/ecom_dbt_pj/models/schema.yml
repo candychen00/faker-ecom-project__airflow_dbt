@@ -1,6 +1,53 @@
 
 models:
+
+  # ---------- src ----------
+
+  - name: src_customers
+    description: |
+      - Staging view over the raw customers source
+      - Adds `customer_sk`, a surrogate key hashed from customer_id, name, email, state and signup_date
+      - All raw columns are passed through unchanged
+
+  - name: src_products
+    description: |
+      - Staging view over the raw products source
+      - Adds `product_sk`, a surrogate key hashed from fruit, category, product_id and price
+      - All raw columns are passed through unchanged
+
+  - name: src_orders
+    description: |
+      - Staging view over the raw orders source
+      - Adds `order_sk`, a surrogate key hashed from order_id, order_at, customer_id, product_id, quantity and created_at
+      - All raw columns are passed through unchanged
+
+  # ---------- intermediate ----------
+
+  - name: int_customers
+    description: |
+      - Deduplicated customers, one row per `customer_sk`
+      - Built from src_customers
+      - Removes exact duplicate records (same values in all surrogate key columns)
+
+  - name: int_products
+    description: |
+      - Deduplicated products, one row per `product_sk`
+      - Built from src_products
+      - Removes exact duplicate records (same values in all surrogate key columns)
+
+  - name: int_orders
+    description: |
+      - Deduplicated orders, one row per `order_sk`
+      - Built from src_orders
+      - Removes exact duplicate records (same values in all surrogate key columns)
+
+  # ---------- dim ----------
+
   - name: dim_products
+    description: |
+      - Product dimension, one row per product
+      - Built from int_products
+      - `product` is the fruit and category joined with a space (e.g. "Apple Juice")
     config:
       contract:
         enforced: true
@@ -67,6 +114,10 @@ models:
 
 
   - name: dim_customers
+    description: |
+      - Customer dimension, one row per customer
+      - Built from int_customers
+      - `first_name` and `last_name` are split from the full name
     config:
       contract:
         enforced: true
@@ -143,7 +194,14 @@ models:
 
 
 
+  # ---------- fct ----------
+
   - name: fct_orders
+    description: |
+      - Order fact table, one row per order
+      - Built from int_orders, joined to dim_products
+      - `order_amt` = quantity * unit_price
+      - Incremental: merges on order_id and reprocesses rows updated within 3 hours of the latest loaded updated_at
     config:
       contract:
         enforced: true
@@ -213,3 +271,54 @@ models:
         data_tests:
           - not_null  
 
+
+  # ---------- mart ----------
+
+  - name: mart_daily_by_prod
+    description: |
+      - Daily sales by product, one row per order_date × product
+      - Built from fct_orders joined to dim_products
+      - Sums ord_quantity and order_amt (rounded to 2 decimals)
+
+  - name: mart_daily_by_cat
+    description: |
+      - Daily sales by product category, one row per order_date × prod_category
+      - Rolled up from mart_daily_by_prod via the `daily_agg` macro
+
+  - name: mart_daily_by_fruit
+    description: |
+      - Daily sales by fruit, one row per order_date × prod_fruit
+      - Rolled up from mart_daily_by_prod via the `daily_agg` macro
+
+  - name: mart_monthly_by_prod
+    description: |
+      - Monthly sales by product, one row per year_month (YYYY-MM) × product
+      - Built from fct_orders joined to dim_products
+      - Sums ord_quantity and order_amt (rounded to 2 decimals)
+
+  - name: mart_monthly_by_cat
+    description: |
+      - Monthly sales by product category, one row per year_month × prod_category
+      - Rolled up from mart_monthly_by_prod via the `monthly_agg` macro
+
+  - name: mart_monthly_by_fruit
+    description: |
+      - Monthly sales by fruit, one row per year_month × prod_fruit
+      - Rolled up from mart_monthly_by_prod via the `monthly_agg` macro
+
+
+  # ---------- data quality ----------
+
+  - name: dq_dup_count
+    description: |
+      - Duplicate-key summary across the raw, intermediate and dim/fct layers
+      - One row per table: dup_count = row count − distinct business key count
+      - Checks orders (order_id), products (product_id) and customers (customer_id)
+      - run_time timezone: Asia/Taipei
+
+  - name: dq_dup_details
+    description: |
+      - Lists each business key that appears more than once in the raw source tables
+      - One row per duplicated id, with how many times it appears (record_count)
+      - Covers raw_orders, raw_customers and raw_products
+      - run_time timezone: Asia/Taipei

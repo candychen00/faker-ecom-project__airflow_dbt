@@ -3,10 +3,12 @@ ecom_dbt_pj:
   outputs:
     dev:
       type: bigquery
+
       method: oauth
       #method: service-account
-      project: "{{ env_var('GCP_PROJECT_ID') }}"
       #keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
+
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: dev
       location: us-east1
       threads: 1
@@ -15,10 +17,12 @@ ecom_dbt_pj:
 
     ci:
       type: bigquery
+
       method: oauth
       #method: service-account
-      project: "{{ env_var('GCP_PROJECT_ID') }}"
       #keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
+
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: ci
       location: us-east1
       threads: 1

@@ -1,14 +1,25 @@
 sources:
   - name: ecom_raw  # source name
+    description: |
+      - Raw e-commerce data generated with Faker Api and loaded into BigQuery `raw_data` dataset
     database: "{{ env_var('GCP_PROJECT_ID') }}"
     schema: raw_data    # bigquery dataset
     tables:
 
       - name: customers # alias table name
         identifier: raw_customers  # actual table name
+        description: |
+          - Raw customer fields: customer_id, name, email, state, signup_date
+          - May contain duplicates; deduplicated downstream in int_customers
 
       - name: products
         identifier: raw_products
+        description: |
+          - Raw product fields: product_id, fruit, category, price
+          - May contain duplicates; deduplicated downstream in int_products
 
       - name: orders
         identifier: raw_orders
+        description: |
+          - Raw order fields: order_id, order_at, customer_id, product_id, quantity
+          - May contain duplicates; deduplicated downstream in int_orders

@@ -8,3 +8,4 @@
 **/gcp-key.json
 .git
 airflow
+.DS_Store

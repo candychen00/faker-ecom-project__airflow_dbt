@@ -1,92 +1,128 @@
-# dbt – Fruit E-commerce Data Warehouse
+# E-commerce Project - DBT Pipeline
 
-這個 dbt project（`ecom_dbt_pj`）負責把 Airflow 載入 BigQuery 的原始電商資料（客戶、商品、訂單），轉換成可分析的維度表、事實表與報表 mart，並內建資料品質檢查、單元測試與 CI/CD。
+This dbt project (`ecom_dbt_pj`) transforms the raw e-commerce data (customers, products, orders) that Airflow loads into BigQuery into analysis-ready dimension tables, fact tables, and reporting marts. It includes built-in dbt data quality checks, unit tests, and CI/CD.
 
-- **Warehouse**：BigQuery
+- **Warehouse**: BigQuery
     - `dbt-bigquery`
-    - OAuth 驗證
+    - OAuth authentication
     - location: `us-east1`
-- **Dbt 套件**：
+- **dbt packages**:
     - `dbt_utils` 1.4.1
     - `dbt_expectations` 0.10.10
-- **Python 環境**：uv（Python ≥ 3.12）
+- **Python environment**: uv **(Python ≥ 3.12)**
+- **dbt Docs**: [https://candychen00.github.io/faker-ecom-project__airflow_dbt/](https://candychen00.github.io/faker-ecom-project__airflow_dbt/) (hosted on GitHub Pages)
 
-## 整體流程
+<br><br>
+
+## dbt Docs (GitHub Pages)
+
+The dbt documentation site (model descriptions, columns, tests, and the lineage graph) is published to GitHub Pages:
+
+👉 **[https://candychen00.github.io/faker-ecom-project__airflow_dbt/](https://candychen00.github.io/faker-ecom-project__airflow_dbt/)**
+
+> It is rebuilt automatically by the **dbt-ci** job (`.github/workflows/dbt-ci.yml`): after `dbt build --target ci` passes, the job runs `dbt docs generate` and deploys `dbt/ecom_dbt_pj/target/` to GitHub Pages.
+
+
+<br><br>
+
+## Overall Flow
 
 ```
-Faker 產生資料 ──► Airflow DAG ──► BigQuery raw_data ──► dbt ──► dev / ci dataset
-(airflow/)        (load_*.py)     raw_customers            │
-                                  raw_products             ├─ src          (view)
-                                  raw_orders               ├─ intermediate (去重)
-                                                           ├─ dim / fct    (維度、事實)
-                                                           ├─ mart         (彙總報表)
-                                                           └─ data_quality (重複檢查)
+Faker api generates data ──► Airflow DAG ──► BigQuery raw_data ──► dbt models ──► dev / ci bigquery datasets
+(airflow/)                  (load_*.py)      raw_customers           │
+                                             raw_products            |─ src          (view)
+                                             raw_orders              ├─ intermediate (deduplication)
+                                                                     ├─ dim / fct    (dimensions, facts)
+                                                                     ├─ mart         (aggregated reports)
+                                                                     └─ data_quality (duplicate checks)
 ```
 
-## Model 分層
+<br><br>
 
-```
-raw_data.* (source: ecom_raw)
-   │
-   ▼
-src_*            view   加上 surrogate key (dbt_utils.generate_surrogate_key)
-   │
-   ▼
-int_*            table  依 surrogate key 去除重複列 (row_number = 1)
-   │
-   ▼
-dim_customers    table  拆 first_name / last_name
-dim_products     table  組合 product = fruit + category
-fct_orders       incremental (merge)  訂單 JOIN 商品價格，計算 order_amt
-   │
-   ▼
-mart_daily_by_{prod,cat,fruit}      table  每日銷量/銷售額
-mart_monthly_by_{prod,cat,fruit}    table  每月銷量/銷售額
-```
+## Model Layers
 
-| 層級 | 目錄 | Materialization | 說明 |
+| Step | Model | Materialization | Description |
+|------|-------|-----------------|-------------|
+| 1 | `raw_data.*` | – | Source data in the BigQuery `raw_data` dataset |
+| 2 | `src_*` | view | Adds surrogate key (method: `dbt_utils.generate_surrogate_key`) |
+| 3 | `int_*` | table | Removes duplicate rows by surrogate key |
+| 4 | `dim_customers` | table | – |
+| 4 | `dim_products` | table | – |
+| 4 | `fct_orders` | incremental (merge) | Joins orders with `dim_products`, computes `order_amt` |
+| 5 | `mart_daily_by_{prod,cat,fruit}` | table | Daily quantity / sales report |
+| 5 | `mart_monthly_by_{prod,cat,fruit}` | table | Monthly quantity / sales report |
+
+<br><br>
+
+## Directory Layers
+
+| Layer | Directory | Materialization | Description |
 |------|------|-----------------|------|
-| Source | `models/sources.yml` | – | `ecom_raw` 對應 BigQuery `raw_data` 的 `raw_customers` / `raw_products` / `raw_orders`；project 由環境變數 `GCP_PROJECT_ID` 指定 |
-| Staging | `models/src/` | view | 為每筆資料產生 `*_sk` surrogate key，保留原始欄位 |
-| Intermediate | `models/intermediate/` | table | 以 `*_sk` 去除重複資料（raw 層可能因重複載入產生 duplicate） |
-| Dimension | `models/dim/` | table | `dim_customers`、`dim_products`，含 `created_at` / `updated_at` |
-| Fact | `models/fct/` | incremental | `fct_orders`：`merge` 策略、`unique_key = order_id`、`on_schema_change = fail`；增量時只處理 `updated_at` 在目前最大值前 3 小時內的資料，以涵蓋延遲到達的資料 |
-| Mart | `models/mart/` | table | 依商品 / 類別 / 水果，按日或月彙總 `ord_quantity`、`order_amt` |
-| Data quality | `models/data_quality/` | table | 重複資料監控（見下方） |
+| Raw | `models/sources.yml` | – | `ecom_raw` maps to BigQuery `raw_data` dataset tables: `raw_customers` / `raw_products` / `raw_orders` |
+| Source | `models/src/` | view | Generates a `*_sk` surrogate key for each record and keeps the original columns |
+| Intermediate | `models/intermediate/` | table | Deduplicates by `*_sk` (the raw and source layers may contain duplicates) |
+| Dimension | `models/dim/` | table | `dim_customers` and `dim_products`, with cleaned data |
+| Fact | `models/fct/` | incremental | `fct_orders` table with `merge` strategy, `unique_key = order_id`, `on_schema_change = fail`; incremental runs only process rows whose `updated_at` is within 3 hours before the current maximum, to cover late-arriving data |
+| Mart | `models/mart/` | table | Aggregates `ord_quantity` and `order_amt` by product / category / fruit, daily or monthly |
+| Data quality | `models/data_quality/` | table | Duplicate monitoring (see below) |
 
-### Mart 與 Macro
+<br>
 
-`mart_daily_by_prod` / `mart_monthly_by_prod` 是最細粒度（商品層級）。其餘 mart 透過 macro 從它們再往上彙總，避免重複 SQL：
+### Marts and Macros
 
-- `daily_agg(group_col)`：`mart_daily_by_cat`、`mart_daily_by_fruit`
-- `monthly_agg(group_col)`：`mart_monthly_by_cat`、`mart_monthly_by_fruit`
+`mart_daily_by_prod` / `mart_monthly_by_prod` are the finest grain (product level). The other marts roll up from them via macros, avoiding repeated SQL:
 
-### Data Quality 監控
+| Macro | Generated marts |
+| --- | --- |
+| `daily_agg(group_col)` | `mart_daily_by_cat`, `mart_daily_by_fruit` |
+| `monthly_agg(group_col)` | `mart_monthly_by_cat`, `mart_monthly_by_fruit` |
 
-- `dq_dup_count`：比較 raw → intermediate → dim/fct 各層 `COUNT(*) - COUNT(DISTINCT key)`，確認重複資料在哪一層被清掉，並附上台北時區的執行時間。
-- `dq_dup_details`：列出 raw 三張表中重複出現的 id 與筆數，方便追查來源。
+<br>
+
+### Data Quality Monitoring
+
+| Model | Purpose | Tables checked |
+| --- | --- | --- |
+| `dq_dup_count` | Counts duplicate records in each table | 9 tables (see below) |
+| `dq_dup_details` | Lists the ids that appear more than once in the three raw tables, along with their counts, to help trace the source | `raw_orders`, `raw_customers`, `raw_products` |
+
+<br>
+
+Tables checked by `dq_dup_count`:
+
+| Entity | Key | Raw | Intermediate | Final |
+| --- | --- | --- | --- | --- |
+| Orders | `order_id` | `raw_orders` | `int_orders` | `fct_orders` |
+| Products | `product_id` | `raw_products` | `int_products` | `dim_products` |
+| Customers | `customer_id` | `raw_customers` | `int_customers` | `dim_customers` |
+
+<br>
 
 ### Snapshots
 
-`snapshots/` 針對 `dim_customers`、`dim_products` 以 `timestamp` 策略（`updated_at`）記錄歷史變化（SCD Type 2）。
+`snapshots/` records historical changes (SCD Type 2) for `dim_customers` and `dim_products` using the `timestamp` strategy (with `updated_at` field).
 
-## 測試
+<br><br>
 
-| 類型 | 位置 | 內容 |
+## Testing
+
+| Type | Location | Content |
 |------|------|------|
-| Contract | `models/schema.yml` | `dim_products`、`dim_customers`、`fct_orders` 啟用 `contract.enforced`，欄位型別固定 |
-| Generic test | `models/schema.yml` | `not_null`、`unique`、`accepted_values`（類別、水果）、`relationships`（`fct_orders` → 兩張 dim） |
-| dbt_expectations | `models/schema.yml` | 數值範圍（`product_id` 0–39、`ord_quantity` / `order_amt` > 0）、姓名 / 州名需首字大寫的 regex |
-| 自訂 generic test | `tests/generic/` | `concat_two_strings`：驗證衍生欄位（`full_name`、`product`）等於來源欄位串接結果 |
-| Unit test | `models/unit_tests.yml` | 驗證 `int_*` 去重邏輯、`dim_products` 組合 product、`dim_customers` 拆姓名 |
+| Contract | `models/schema.yml` | • `contract.enforced` is enabled on `dim_products`, `dim_customers`, and `fct_orders`<br>• Assign column types |
+| Generic test | `models/schema.yml` | • `not_null`<br>• `unique`<br>• `accepted_values` (for category, fruit fields)<br>• `relationships` (`fct_orders` <> `dim_products` `dim_customers`) |
+| dbt_expectations | `models/schema.yml` | • Value ranges: `product_id` 0–39<br>• `ord_quantity` / `order_amt` > 0<br>• Regex requiring capitalized customer names and state names |
+| Custom generic test | `tests/generic/` | • `concat_two_strings`  verifies `product` is the concatenation of their source columns |
+| Unit test | `models/unit_tests.yml` | • Verifies the `int_*` deduplication logic<br>• Verifies `dim_products` product construction<br>• Verifies `dim_customers` name splitting |
 
-## 專案結構
+<br><br>
+
+## Project Structure
 
 ```
 dbt/
-├── pyproject.toml / uv.lock     # Python 依賴 (dbt-bigquery, python-dotenv)
-├── .env                         # 本機環境變數（不要 commit）
-├── secret/                      # GCP 金鑰（不要 commit）
+├── pyproject.toml / uv.lock     # Python dependencies (dbt-bigquery, python-dotenv)
+├── .env                         # Local environment variables (do not commit)
+├── secret/                      # GCP keys (do not commit)
 └── ecom_dbt_pj/
     ├── dbt_project.yml
     ├── profiles.yml             # targets: dev / ci
@@ -97,32 +133,64 @@ dbt/
     └── tests/generic/
 ```
 
-## 本機執行
+<br><br>
+
+## Running Locally
+
+> - `threads: 1`
+> - BigQuery datasets: `dev` (default) and `ci`.
+
 
 ```bash
 cd dbt
 uv sync
 
-# 需要的環境變數
-export GCP_PROJECT_ID=<your-gcp-project>
-gcloud auth application-default login      # profiles.yml 使用 oauth
+
+# Required environment variable
+GCP_PROJECT_ID=<your-gcp-project>
+GCP_SECRET_PATH="../secret/gcp-key.json"
+
+
+# in profiles.yml
+# ↓ Use this when runing on github action
+method: oauth
+# ↓ Use this when runing on local
+method: service-account
+keyfile: "{{ env_var('GCP_SECRET_PATH') }}"
+
 
 cd ecom_dbt_pj
 uv run dbt deps
-uv run dbt build                  # run + test + snapshot（預設 target: dev）
-uv run dbt build --target ci      # 寫入 ci dataset
-uv run dbt build --select tag:ord # 只跑訂單相關 model（tags: cust / prod / ord / data_quality）
+uv run dbt build                   # run + test + snapshot (default target: dev)
+uv run dbt build --target ci       # writes to the ci dataset
+uv run dbt build --select tag:ord  # only run order-related models (tags: cust / prod / ord / data_quality)
 uv run dbt test --select test_type:unit
 uv run dbt docs generate && uv run dbt docs serve
 ```
 
-> `threads: 1`，BigQuery dataset：`dev`（預設）與 `ci`。
+
+<br><br>
 
 ## CI/CD
 
-`.github/workflows/dbt-ci.yml`（`dbt/**` 有變動並 push 到 `main`，或手動觸發）：
+`.github/workflows/dbt-ci.yml`: 
 
-1. **dbt-ci**：`dbt deps` → `dbt parse` → `dbt compile --target ci` → `dbt build --target ci`（含測試）→ 無論成功與否，刪除 `ci` dataset。
-2. **dbt-cd**（CI 成功後）：用根目錄 `Dockerfile` build image（預設指令 `dbt build`）→ push 到 Google Artifact Registry（`<sha>` 與 `latest` tag）→ 更新 Cloud Run Job `ecom-pj` 使用新 image。
+(triggered by pushes to `main` that change `dbt/**`, or manually)
 
-所需 GitHub Secrets：`GCP_SA_KEY`、`GCP_PROJECT_ID`、`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`。
+a. **dbt-ci**:
+  1. `dbt deps`
+  2. `dbt parse`
+  3. `dbt compile --target ci`
+  4. `dbt build --target ci` (including tests)
+  5. Delete the `ci` dataset regardless of success or failure
+  6. `dbt docs generate`
+  7. Deploy dbt docs to [GitHub Pages](https://candychen00.github.io/faker-ecom-project__airflow_dbt/)
+  
+b. **dbt-cd** (after CI succeeds):
+  1. Build an image from the root `Dockerfile` (default command `dbt build`)
+  2. Push to Google Artifact Registry (`<sha>` and `latest` tags)
+  3. Update the Cloud Run Job `ecom-pj` to use the new image
+
+> Required GitHub Secrets: `GCP_SA_KEY`, `GCP_PROJECT_ID`, `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
+
+<br><br>

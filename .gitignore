@@ -3,6 +3,7 @@
 __pycache__
 logs/
 .git
+.DS_Store
 
 # secrets
 .env
