@@ -23,6 +23,9 @@ env:
   GAR_IMAGE: dbt-pj
   GAR_TAG: ${{ github.sha }}
 
+  IMAGE_NAME: candychen00/ecom-pj
+  TAG_NAME: test
+
 
 jobs:
   dbt-ci:
@@ -143,39 +146,57 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }} # Your service account key stored in GitHub Secrets
 
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker us-east1-docker.pkg.dev
+      # - name: Configure Docker for Artifact Registry
+      #   run: gcloud auth configure-docker us-east1-docker.pkg.dev
 
 
-      - name: Delete all images in GAR repo
-        run: |
-          REPO_PATH=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}
-          for IMG in $(gcloud artifacts docker images list $REPO_PATH --include-tags --format="value(package)" | sort -u); do
-            gcloud artifacts docker images delete $IMG --delete-tags --quiet
-          done
+      # - name: Delete all images in GAR repo
+      #   run: |
+      #     REPO_PATH=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}
+      #     for IMG in $(gcloud artifacts docker images list $REPO_PATH --include-tags --format="value(package)" | sort -u); do
+      #       gcloud artifacts docker images delete $IMG --delete-tags --quiet
+      #     done
 
 
-      - name: Build docker image
-        run: |
-          IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}
-          docker build --platform linux/amd64 -t $IMAGE:${{ env.GAR_TAG }} -t $IMAGE:latest .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
 
-      - name: Push docker image
-        run: |
-          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
-          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:latest
+      - name: Build and Push Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+
+      # - name: Build docker image
+      #   run: |
+      #     IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}
+      #     docker build --platform linux/amd64 -t $IMAGE:${{ env.GAR_TAG }} -t $IMAGE:latest .
+
+
+      # - name: Push docker image
+      #   run: |
+      #     docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
+      #     docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:latest
 
 
       - name: 'Set up Google Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v3'
 
 
-      - name: Deploy to Cloud Run Job
+      - name: Update Cloud Run Job
         run: |
-          IMAGE=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPO }}/${{ env.GAR_IMAGE }}:${{ env.GAR_TAG }}
-          if gcloud run jobs describe ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} >/dev/null 2>&1; then
-            gcloud run jobs update ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} --image $IMAGE
-          else
-            gcloud run jobs create ${{ env.GCP_JOB_NAME }} --region ${{ env.GCP_REGION }} --image $IMAGE
-          fi
+          gcloud run jobs update $GCP_JOB_NAME \
+            --image=$IMAGE_NAME:${{ github.sha }} \
+            --region=$GCP_REGION \
+            --project=$GCP_PROJECT_ID
