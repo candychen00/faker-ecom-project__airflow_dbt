@@ -24,7 +24,6 @@ env:
   GAR_TAG: ${{ github.sha }}
 
   IMAGE_NAME: candychen00/ecom-pj
-  TAG_NAME: ecom-dbt-pj
 
 
 jobs:
@@ -165,13 +164,13 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
 
 
       - name: Update Cloud Run Job
         run: |
           gcloud run jobs update $GCP_JOB_NAME \
-            --image=$IMAGE_NAME:${{ env.TAG_NAME }} \
+            --image=$IMAGE_NAME:${{ github.sha }} \
             --region=$GCP_REGION \
             --project=$GCP_PROJECT_ID
