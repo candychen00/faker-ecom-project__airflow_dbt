@@ -116,7 +116,7 @@ Airflow and dbt never import each other's code. They are linked in two ways:
 1. **Through BigQuery tables.** Airflow writes the tables that dbt reads, and the other way round.
 2. **Through the Cloud Run job `ecom-pj`.** Airflow triggers Cloud run job, and GitHub Actions keeps its image up to date.
 
-### 1. Runtime flow (data)
+### 1. Runtime flow
 
 ```mermaid
 flowchart LR
@@ -136,7 +136,7 @@ flowchart LR
 ```
 
 
-### 2. Deployment flow (code)
+### 2. Deployment flow
 
 ```mermaid
 flowchart LR
@@ -148,22 +148,24 @@ flowchart LR
     end
 
     subgraph GHCD["Github Action (cd job)"]
-        CD["docker build <br>with root Dockerfile"]
-        GAR[(Google<br>Artifact Registry)]
-        JOB[["Cloud Run job ecom-pj<br>updated to new image"]]
+        CD["docker build<br>(root Dockerfile)"]
+        GAR[(Google<br>Artifact<br>Registry)]
+        JOB[["Cloud Run job"]]
     end
-    
-    JOB -. "next load_dbt run" .-> AIR["Airflow"]
 
     PUSH -. trigger .-> CI
     CI -- pass --> DOCS
-    DOCS -- pass --> CD --> GAR --> JOB
+    DOCS -- pass --> CD
+    CD -- "docker<br>push" --> GAR
+    GAR -. "update<br>image" .-> JOB
+
+    JOB -. "ready for<br>next load_dbt run" .-> AIR["Airflow"]
 
 ```
 
 - A change under `dbt/` starts the workflow. It first runs `dbt build` against a temporary `ci` dataset, which is deleted afterwards.
 - If CI passes, the workflow publishes the dbt Docs and builds a new Docker image from the root `Dockerfile`. It then points the Cloud Run job `ecom-pj` at that image.
-- Airflow doesn't need a redeploy. The next `load_dbt` run uses the latest dbt code.
+- The next `load_dbt` dag run uses the latest dbt code.
 
 <br><br>
 
@@ -181,20 +183,20 @@ flowchart LR
 
 ```text
 faker-ecom-project__airflow_dbt/
-├── airflow/                    # Extract & Load + orchestration   → airflow/README.md
-│   ├── dags/                   #   load_products, load_customers, load_orders, load_dbt
-│   ├── plugins/                #   shared helpers & Pydantic schemas
-│   ├── pytests/                #   unit tests
+├── airflow/                    # Extract & Load + orchestration  → airflow/README.md
+│   ├── dags/                       #   load_products, load_customers, load_orders, load_dbt
+│   ├── plugins/                    #   shared helpers & Pydantic schemas
+│   ├── pytests/                    #   unit tests
 │   ├── Dockerfile
 │   └── docker-compose.yaml
-├── dbt/                        # Transform                        → dbt/README.md
-│   ├── ecom_dbt_pj/            #   dbt project (models, macros, snapshots, tests)
+├── dbt/                        # Transform  → dbt/README.md
+│   ├── ecom_dbt_pj/                #   dbt project (models, macros, snapshots, tests)
 │   ├── pyproject.toml
 │   └── uv.lock
 ├── Dockerfile                  # dbt image for the Cloud Run job
 ├── .dockerignore
 └── .github/workflows/
-    └── dbt-ci.yml              # dbt CI (test + docs) and CD (image → Cloud Run)
+    └── dbt-cicd.yml              # dbt CI (test + docs) and CD (image → Cloud Run)
 ```
 
 <br><br>
@@ -203,15 +205,28 @@ faker-ecom-project__airflow_dbt/
 
 Each side is set up on its own:
 
-1. **dbt**: install with uv, configure `profiles.yml`, and run `dbt build` locally. Make sure the Cloud Run job `ecom-pj` exists.
-   → [dbt/README.md › Running Locally](dbt/README.md#running-locally) and [CI/CD](dbt/README.md#cicd)
-2. **Airflow**: add the GCP key and `.env`, run `docker compose up`, then trigger the DAGs in the first-run order.
+1. **`/airflow`**:
+    
+    - Run `docker compose up --build -d`, then trigger the DAGs in the first-run order.
    → [airflow/README.md › Local setup](airflow/README.md#local-setup)
+
+2. **`/dbt`**: 
+    - Add `secret/gcp-key.json` and `.env`
+    - Install with `uv sync --frozen`
+    - If you want to run locally:
+        - `cd /ecom_dbt_pj`
+        - `dbt debug` : all pass!
+        - `dbt deps`
+        - `dbt build` or `run` or `test`
 
 **You'll need:**
 
-- A GCP project with BigQuery, Cloud Storage, Cloud Run and Artifact Registry
-- A service account key for that project
-- A Neon Postgres database
+- A **Google Cloud Service Account** with these permissions
+    - **BigQuery**
+    - **Cloud Storage**
+    - **Cloud Run**
+    - **Artifact Registry**
+    - **Logs**
+- A **Neon Postgres** database
 - The Ecom fake-data API URL and key
-- A Discord webhook for notifications
+- A **Discord** webhook for notifications
