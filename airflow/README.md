@@ -36,7 +36,7 @@ flowchart TB
         API(Ecom API)
         PG[(Neon<br>PostgresDB)]
         GCS[(GCS bucket)]
-        RAW[(BigQuery<br/>raw_data.*)]
+        RAW[(BigQuery<br/>raw_data.raw_products<br>raw_data.raw_customers)]
     end
 
     subgraph ROW2["Ingestion (Orders Data)"]
@@ -48,7 +48,7 @@ flowchart TB
     subgraph ROW3["Transformation (DBT on BigQuery)"]
         direction LR
         DBT[[Cloud Run job<br>dbt build]]
-        BQ_RAW[(BigQuery<br/>raw_data.raw_products<br>raw_data.raw_customers)]
+        BQ_RAW[(BigQuery<br/>raw_data.raw_*)]
         BQ_SRC[(BigQuery<br/>dev.src_*)]
         BQ_INT[(BigQuery<br/>dev.int_*)]
         BQ_DIM_FCT[(BigQuery<br/>dev.dim_*<br>dev.fct_*)]
