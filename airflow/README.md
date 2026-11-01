@@ -41,17 +41,17 @@ flowchart TB
 
     subgraph ROW2["Ingestion (Orders Data)"]
         direction LR
-        BQ_DIM[(BigQuery<br>dev.dim_*)]
+        BQ_DIM[(BigQuery<br>dev.dim_products<br>dev.dim_customers)]
         BQ_FCT[(BigQuery<br>raw_data.raw_orders)]
     end
 
     subgraph ROW3["Transformation (DBT on BigQuery)"]
         direction LR
         DBT[[Cloud Run job<br>dbt build]]
-        BQ_RAW[(BigQuery<br/>raw_data.raw_*)]
+        BQ_RAW[(BigQuery<br/>raw_data.raw_products<br>raw_data.raw_customers)]
         BQ_SRC[(BigQuery<br/>dev.src_*)]
         BQ_INT[(BigQuery<br/>dev.int_*)]
-        BQ_DIM_FCT[(BigQuery<br/>dev.dim_* & fct_*)]
+        BQ_DIM_FCT[(BigQuery<br/>dev.dim_*<br>dev.fct_*)]
     end
 
     API -- dag: load_products --> PG
