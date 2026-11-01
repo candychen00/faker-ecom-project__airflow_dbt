@@ -243,26 +243,25 @@ flowchart LR
 ```text
 airflow/
 ├── dags/                          # Mounted into /opt/airflow/dags
-│   ├── load_products.py           # Products: API → Postgres → GCS → BQ
-│   ├── load_customers.py          # Customers: API → GCS → BQ (daily)
-│   ├── load_orders.py             # Orders: generated from dim tables → GCS → BQ (daily)
-│   └── load_dbt.py                # Starts the dbt Cloud Run job
+│   ├── load_products.py 
+│   ├── load_customers.py
+│   ├── load_orders.py
+│   └── load_dbt.py 
 ├── plugins/                       # Shared helpers, imported as `plugins.*`
-│   ├── fn_api_get.py              # get_api_data(): GET request with error handling
-│   ├── fn_api_verification.py     # verify_api(): Pydantic check → valid / invalid lists
-│   ├── fn_fetch_random.py         # fetch_random_rows(): random sample from a BQ dev table
+│   ├── fn_api_get.py                   # GET request with error handling
+│   ├── fn_api_verification.py          # Pydantic check for api data
+│   ├── fn_fetch_random.py              # fetch random sample from a BQ dev table
 │   └── api_schemas/
-│       ├── customers.py           # CustomersBase schema
-│       └── products.py            # ProductBase schema
+│       ├── customers.py                # CustomersBase schema
+│       └── products.py                 # ProductBase schema
 ├── pytests/                       # pytest unit tests (mounted into the container)
 │   ├── test_load_customers/
 │   └── test_load_products/
-│       └── complete_prod_data.py  # Expected product data, also used by load_products
+│       └── complete_prod_data.py       # Expected product data
 ├── config/
-│   └── airflow.cfg                # Mounted as AIRFLOW_CONFIG
+│   └── airflow.cfg                     # Mounted as AIRFLOW_CONFIG
 ├── secret/
 │   └── gcp-key.json               # GCP service account key (gitignored, mounted read-only)
-├── logs/                          # Airflow task logs (gitignored)
 ├── .env                           # Environment variables & connections (gitignored)
 ├── Dockerfile                     # apache/airflow:3.3.2-python3.12 + requirements.txt
 ├── docker-compose.yaml            # Postgres metadata DB + Airflow services
@@ -271,28 +270,21 @@ airflow/
 └── .python-version                # 3.12
 ```
 
-The image sets `PYTHONPATH=/opt/airflow`, and `dags/`, `plugins/` and `pytests/` are mounted under `/opt/airflow`. This is why DAGs can use imports like `from plugins.fn_api_get import ...` and `from pytests.test_load_products... import ...`.
-
----
+<br><br>
 
 ## Local setup
 
 ### Prerequisites
 
-- Docker Desktop (Docker Compose v2), with at least 4 GB of memory available to Docker
-- A GCP project containing:
-  - a **GCS bucket**
-  - **BigQuery** (datasets are created in `us-east1`)
-  - a **service account** with access to Storage, BigQuery, and Cloud Run (Storage Object Admin, BigQuery Data Editor + Job User, Cloud Run Invoker/Developer), plus its JSON key
-- A **Neon** (or any other) Postgres database for `ecom_products`
+- **Docker Desktop**
+- A **service account** with access to **Storage, BigQuery, Cloud Run**, plus its **JSON key**
+- A **Neon** Postgres database for `ecom_products`
 - The **Ecom fake-data API** URL and API key
 - A **Discord webhook** URL (for notifications)
-- Optional: [uv](https://docs.astral.sh/uv/), if you want a local virtualenv for IDE autocompletion
 
-### 1. Clone and go to the folder
+### 1. Go to the airflow folder
 
 ```bash
-git clone <repo-url>
 cd faker-ecom-project__airflow_dbt/airflow
 ```
 
@@ -303,7 +295,7 @@ mkdir -p secret
 cp /path/to/your-service-account.json secret/gcp-key.json
 ```
 
-Docker Compose mounts this file read-only at `/opt/airflow/secret/gcp-key.json`.
+> Docker Compose mounts this file read-only at `/opt/airflow/secret/gcp-key.json`.
 
 ### 3. Create `.env`
 
@@ -340,40 +332,23 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 The `AIRFLOW_CONN_*` variables define Airflow connections directly from the environment, so you don't need to create them in the UI. All DAGs use the GCP connection `google_cloud_default`.
 
-### 4. Build the image and initialise Airflow
+### 4. Start Airflow
 
 ```bash
-docker compose build
-docker compose up airflow-init
+docker compose up --build -d
 ```
 
-`airflow-init` runs the metadata-DB migrations and creates the default admin user (**airflow / airflow**). To use different credentials, set `_AIRFLOW_WWW_USER_USERNAME` and `_AIRFLOW_WWW_USER_PASSWORD` in `.env`.
+Open **http://localhost:8080** and log in to default admin user (airflow / airflow).
 
-### 5. Start Airflow
+### 5. Run the DAGs
 
-```bash
-docker compose up -d
-docker compose ps        # wait until every service shows "healthy"
-```
-
-Open **http://localhost:8080** and log in.
-
-### 6. Run the DAGs
-
-New DAGs start **paused** (`DAGS_ARE_PAUSED_AT_CREATION=true`). Unpause them in the UI, or from the CLI:
-
-```bash
-docker compose run --rm airflow-cli dags unpause load_customers
-docker compose run --rm airflow-cli dags trigger load_products
-```
-
+New DAGs start **paused** (`DAGS_ARE_PAUSED_AT_CREATION=true`). Unpause them in the UI.
 Follow the [first-run order](#how-the-dags-fit-together): `load_products` → `load_customers` → `load_dbt` → `load_orders`.
 
-### 7. Stop / reset
+### 6. Stop / reset
 
 ```bash
-docker compose down            # stop the containers
-docker compose down -v         # also delete the Airflow metadata DB volume
+docker compose down
 ```
 
 ### Optional: local virtualenv (for editor support)
@@ -394,25 +369,5 @@ docker compose build && docker compose up -d
 
 The Dockerfile installs packages with the official Airflow 3.3.2 constraints file, which keeps provider versions compatible.
 
----
 
-## Running tests
 
-The unit tests in `pytests/` cover the API helper and the Pydantic validation. Run them inside the Airflow container:
-
-```bash
-docker compose run --rm --entrypoint bash airflow-cli -c "cd /opt/airflow && pytest pytests -v"
-```
-
----
-
-## Troubleshooting
-
-| Symptom | Likely cause |
-|---|---|
-| DAG missing from the UI | Import error. Check **Browse → DAG Import Errors**, or run `docker compose logs airflow-dag-processor`. |
-| `load_products` skips every task after the branch | `ecom_products` holds a row count other than 0 or 40. Fix or truncate the table. |
-| `verify_prod_tbl` fails with `AssertionError` | The Postgres products no longer match `complete_prod_data.py` |
-| `load_orders` fails on `random_cust` / `random_prod` | The `dev.dim_*` tables don't exist yet. Run `load_dbt` first. |
-| BigQuery load fails with a type mismatch | The parquet column types don't match `schema_fields`. Check the `datetime` and `decimal` casts in `save_to_tmp`. |
-| Permission errors on `logs/` | `AIRFLOW_UID` in `.env` doesn't match your host user (`id -u`) |
