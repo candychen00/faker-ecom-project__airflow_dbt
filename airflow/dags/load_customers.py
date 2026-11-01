@@ -22,7 +22,7 @@ ECOM_API_URL=os.getenv("ECOM_API_URL")
 ECOM_API_HEADERS = {
     "X-API-Key": os.getenv("ECOM_API_KEY")
 }
-GCP_CLOUD_STORAGE_PROJECT_ID= os.getenv("GCP_CLOUD_STORAGE_PROJECT_ID")
+GCP_PROJECT_ID= os.getenv("GCP_PROJECT_ID")
 GCP_CLOUD_STORAGE_BUCKET_NAME= os.getenv("GCP_CLOUD_STORAGE_BUCKET_NAME")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
@@ -97,7 +97,7 @@ def load_customers():
         task_id="create_bq_dataset",
         gcp_conn_id= "google_cloud_default",
 
-        project_id=GCP_CLOUD_STORAGE_PROJECT_ID,
+        project_id=GCP_PROJECT_ID,
         dataset_id="raw_data",
         location= "us-east1",
         exists_ok=True, # Dataset 已存在時，不會因為重複建立而失敗

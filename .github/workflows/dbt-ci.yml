@@ -15,17 +15,16 @@ env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GCP_REGION: us-east1
 
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
   GCP_JOB_NAME: ecom-pj
   GAR_REPO: ecom-pj
   GAR_IMAGE: dbt-pj
   GAR_TAG: ${{ github.sha }}
   GAR_IMAGE_URI: us-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ecom-pj/dbt-pj
 
+  #DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  #DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  #IMAGE_NAME: candychen00/ecom-pj
 
-  IMAGE_NAME: candychen00/ecom-pj
 
 
 jobs:

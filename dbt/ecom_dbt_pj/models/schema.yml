@@ -232,6 +232,8 @@ models:
               arguments:
                 to: ref('dim_products')
                 field: product_id
+              config:
+                tags: ["fct"]
 
       - name: customer_id
         data_type: string(50)
@@ -241,6 +243,8 @@ models:
               arguments:
                 to: ref('dim_customers')
                 field: customer_id
+              config:
+                tags: ["fct"]
 
       - name: ord_quantity
         data_type: integer
