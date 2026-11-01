@@ -1,11 +1,13 @@
 # Faker E-commerce Project — Airflow + dbt
 
-An end-to-end ELT pipeline for a fake e-commerce shop. **Airflow** loads raw products, customers and orders into **BigQuery**. **dbt** then turns that raw data into dimension tables, fact tables and reporting marts.
+An end-to-end ELT pipeline for a fake e-commerce data. 
+
+**Airflow** loads raw products, customers and orders data into **BigQuery**. **dbt** then turns the raw data into dimension tables, fact tables and reporting marts.
 
 | Folder | Role | Runs on | Details |
 |---|---|---|---|
-| [`airflow/`](airflow/) | **Extract & Load**: pulls data, checks it, lands it in GCS and BigQuery, and starts dbt | Docker Compose (Airflow 3, `LocalExecutor`) | 👉 [airflow/README.md](airflow/README.md) |
-| [`dbt/`](dbt/) | **Transform**: builds the `src` → `int` → `dim` / `fct` → `mart` models, plus tests and data-quality checks | Cloud Run job (Docker image), GitHub Actions for CI | 👉 [dbt/README.md](dbt/README.md) |
+| [`airflow/`](airflow/) | **Extract & Load**: pulls data, checks it, lands it in GCS and BigQuery, and starts dbt | **Docker Compose**<br>(Airflow 3, `LocalExecutor`) | 👉 [airflow/README.md](airflow/README.md) |
+| [`dbt/`](dbt/) | **Transform**: builds BigQuery tables ( `src` → `int` → `dim` / `fct` → `mart` models), and runs tests and data-quality checks | **GitHub Actions** (CI/CD)<br>tests dbt, then builds the Docker image and deploys it to the Cloud Run job<br><br>**Cloud Run job**<br>(started by Airflow)| 👉 [dbt/README.md](dbt/README.md) |
 
 **Stack:** Airflow · dbt (`dbt-bigquery`) · BigQuery · Google Cloud Storage · Cloud Run · Artifact Registry · Neon Postgres · GitHub Actions · uv · Docker
 
@@ -31,52 +33,59 @@ An end-to-end ELT pipeline for a fake e-commerce shop. **Airflow** loads raw pro
 flowchart LR
     subgraph AF["airflow/  (Extract & Load)"]
         direction TB
-        API(Ecom fake-data API)
+        API(Ecom API data)
         PG[(Neon Postgres)]
         GCS[(GCS bucket)]
     end
 
-    subgraph BQ["BigQuery"]
+    subgraph BQ["dbt/  (BigQuery)"]
         direction TB
         RAW[(raw_data.raw_*)]
-        DEV[(dev.src_* → int_* → dim_* / fct_* → mart_*)]
+        DEV[(dev.src_*<br>→ int_*<br>→ dim_* / fct_*<br>→ mart_*)]
     end
 
     subgraph DBT["dbt/  (Transform)"]
         direction TB
-        GH[[GitHub Actions<br>dbt-ci]]
+        GH[[GitHub Actions<br>dbt-cicd]]
         GAR[(Artifact Registry<br>dbt image)]
         CR[[Cloud Run job<br>ecom-pj]]
     end
 
     API --> PG --> GCS
     API --> GCS
-    GCS -- "load_products / load_customers" --> RAW
-    DEV -- "load_orders reads dim_*" --> RAW
+    GCS --> RAW
 
     GH -- "build & push image" --> GAR --> CR
-    CR -- "triggered by load_dbt<br>dbt build --target dev" --> DEV
+    CR --> DEV
     RAW --> DEV
 ```
 
-In one sentence: **Airflow fills `raw_data`; dbt reads `raw_data` and writes the modelled tables to `dev`.** Airflow is also the orchestrator, so it starts the dbt run when the raw data is ready.
+> **GitHub Actions keeps the Cloud Run job up to date.** 
+> 
+> Every push to `dbt/ecom_dbt_pj` tests the dbt project, builds a new image and deploys it to the `ecom-pj` Google cloud run job, so Airflow always runs the latest dbt code.
+>
+> **Airflow loads the data, and dbt transforms it.** 
+>
+> Airflow's DAGs pull data from the Ecom API and load it into the BigQuery `raw_data` dataset. The `load_dbt` DAG then starts the Cloud Run job, which runs `dbt build` to read `raw_data` and write the modelled tables to the `dev` dataset.
 
 <br><br>
 
-## What each folder contains
+## Root-level Folders and Files
 
 ### `airflow/` — ingestion and orchestration
 
 - **DAGs** (`dags/`):
   - `load_products`: fetches the product catalogue from the API, stores it in Neon Postgres, then copies it to BigQuery.
-  - `load_customers`: fetches customers from the API every day and appends them to BigQuery.
-  - `load_orders`: generates random orders from existing customers and products every day.
+  - `load_customers`: fetches customers from the API and appends them to BigQuery.
+  - `load_orders`: generates random orders from existing customers and products.
   - `load_dbt`: starts the dbt Cloud Run job.
 - **Plugins** (`plugins/`): shared helpers such as API calls and Pydantic schema checks.
-- **Tests** (`pytests/`): pytest unit tests for the DAG logic.
-- **Runtime**: `Dockerfile` and `docker-compose.yaml` to run Airflow locally.
+- **Tests** (`pytests/`): pytest unit tests for the plugin helpers (API fetching and Pydantic schema validation).
+- **Local setup**: `Dockerfile` and `docker-compose.yaml` to run Airflow locally.
 
-➡️ DAG diagrams, task tables, `.env` setup and troubleshooting: **[airflow/README.md](airflow/README.md)**
+➡️ See **[airflow/README.md](airflow/README.md)** for the full details on the Airflow setup.
+
+<br>
 
 ### `dbt/` — transformation and data quality
 
@@ -85,17 +94,18 @@ In one sentence: **Airflow fills `raw_data`; dbt reads `raw_data` and writes the
   - `macros/`: reusable daily and monthly aggregations used by the marts.
   - `snapshots/`: SCD history for `dim_customers` and `dim_products`.
   - Tests: generic tests, `dbt_expectations`, and unit tests.
-- **Python environment**: `pyproject.toml` and `uv.lock`, managed by uv.
 
-➡️ Model layers, tests, snapshots, local runs and CI/CD details: **[dbt/README.md](dbt/README.md)**
+➡️ See **[dbt/README.md](dbt/README.md)** for the full details on the dbt setup.
 
-### Root-level files — the bridge between the two
+<br>
+
+### Other Root-level files
 
 | File | Purpose |
 |---|---|
-| [`Dockerfile`](Dockerfile) | Packages the `dbt/` folder into an image whose default command is `dbt build`. Cloud Run runs this image. |
-| [`.dockerignore`](.dockerignore) | Keeps `airflow/`, secrets and dbt build outputs out of the dbt image. |
+| [`.dockerignore`](.dockerignore)<br>[`.gitignore`](.gitignore) | Keeps secrets out of github and dbt image. |
 | [`.github/workflows/dbt-ci.yml`](.github/workflows/dbt-ci.yml) | CI/CD for dbt: tests the models, publishes dbt Docs, then deploys a new image to the Cloud Run job. |
+| [`Dockerfile`](Dockerfile) | Packages the `dbt/` folder into an image via Github Action CI/CD. Cloud Run runs this image. |
 
 <br><br>
 
@@ -104,32 +114,51 @@ In one sentence: **Airflow fills `raw_data`; dbt reads `raw_data` and writes the
 Airflow and dbt never import each other's code. They are linked in two ways:
 
 1. **Through BigQuery tables.** Airflow writes the tables that dbt reads, and the other way round.
-2. **Through the Cloud Run job `ecom-pj`.** Airflow triggers it, and GitHub Actions keeps its image up to date.
+2. **Through the Cloud Run job `ecom-pj`.** Airflow triggers Cloud run job, and GitHub Actions keeps its image up to date.
 
 ### 1. Runtime flow (data)
 
-| Step | Who | What happens | Reads | Writes |
-|---|---|---|---|---|
-| 1 | Airflow `load_products` | Loads the product catalogue (API → Postgres → GCS → BigQuery) | Ecom API | `raw_data.raw_products` |
-| 2 | Airflow `load_customers` | Loads new customers (API → GCS → BigQuery) | Ecom API | `raw_data.raw_customers` |
-| 3 | Airflow `load_dbt` → dbt | Runs `dbt build --target dev` on Cloud Run | `raw_data.*` | `dev.src_*`, `dev.int_*`, `dev.dim_*`, `dev.fct_*`, `dev.mart_*` |
-| 4 | Airflow `load_orders` | Generates orders from random existing customers and products | `dev.dim_customers`, `dev.dim_products` | `raw_data.raw_orders` |
-| 5 | Airflow `load_dbt` → dbt | Runs dbt again so the new orders reach `fct_orders` and the marts | `raw_data.*` | `dev.*` |
+```mermaid
+flowchart LR
+    AF([Airflow DAG ])
+    API(Ecom API)
+    RAW[("BigQuery<br><br>raw_data.raw_products<br>raw_data.raw_customers<br>raw_data.raw_orders")]
+    DBT[["Cloud run job<br>dbt build"]]
+    DIM[("BigQuery<br><br>dev.dim_*<br>dev.fct_*<br>dev.mart_*")]
+    CICD("dbt CI/CD<br>via Github Action")
 
-> **Two-way dependency:** `load_orders` reads the dbt-built `dim_*` tables, so dbt must run once **before** the first `load_orders`. On a fresh environment, run:
-> `load_products` → `load_customers` → `load_dbt` → `load_orders` → `load_dbt`.
-> See [airflow/README.md › How the DAGs fit together](airflow/README.md#how-the-dags-fit-together).
+    AF -. trigger .-> API
+    AF -. trigger .-> DBT
+    API -- load --> RAW
+    RAW -- "source" --> DBT
+    DBT -- "build models" --> DIM
+    CICD -. "update<br>job image" .-> DBT
+```
+
 
 ### 2. Deployment flow (code)
 
 ```mermaid
 flowchart LR
-    PUSH["push to main<br>(changes in dbt/**)"] --> CI["dbt-ci job<br>dbt build --target ci"]
-    CI -- pass --> DOCS["dbt docs → GitHub Pages"]
-    CI -- pass --> CD["dbt-cd job<br>docker build (root Dockerfile)"]
-    CD --> GAR[(Artifact Registry)]
-    GAR --> JOB[["Cloud Run job ecom-pj<br>updated to new image"]]
+    PUSH(["push to main<br>(changes in<br>dbt/ecom_dbt_pj**)"])
+    
+    subgraph GHCI["Github Action (ci job)"]
+        CI["dbt build --target ci"]
+        DOCS["dbt docs → GitHub Pages"]
+    end
+
+    subgraph GHCD["Github Action (cd job)"]
+        CD["docker build <br>with root Dockerfile"]
+        GAR[(Google<br>Artifact Registry)]
+        JOB[["Cloud Run job ecom-pj<br>updated to new image"]]
+    end
+    
     JOB -. "next load_dbt run" .-> AIR["Airflow"]
+
+    PUSH -. trigger .-> CI
+    CI -- pass --> DOCS
+    DOCS -- pass --> CD --> GAR --> JOB
+
 ```
 
 - A change under `dbt/` starts the workflow. It first runs `dbt build` against a temporary `ci` dataset, which is deleted afterwards.

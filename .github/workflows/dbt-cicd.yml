@@ -6,7 +6,6 @@ on:
     branches: [main]
     paths:
       - "dbt/ecom_dbt_pj/**"
-      - ".github/workflows/dbt-ci.yml"
 
   workflow_dispatch:
 
