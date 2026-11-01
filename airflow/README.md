@@ -108,7 +108,7 @@ title: "Dag: load_products"
 ---
 flowchart LR
     A[fetch_products_api] --> B[create_table_if_not_exists]
-    B --> C{check_prod_table_len}
+    B --> C{Branch: <br>check_prod_table_len}
     C -- "count = 0" --> G
     subgraph G[save_data_to_pg_group]
         G1[verify_api_data] --> G2[insert_data_to_pg]
@@ -121,20 +121,19 @@ flowchart LR
     H --> I[send_success_msg]
 ```
 
-<br>
 
-| Task | What it does |
-|---|---|
-| `fetch_products_api` |  Fetch data from Ecom Api `GET {ECOM_API_URL}/products/generate_all_products` |
-| `create_table_if_not_exists` | Creates the Postgres table `ecom_products` (`product_id`, `fruit`, `category`, `price NUMERIC(8,2)`) if it is missing |
-| `check_prod_table_len` | **Branch.** - counts the rows in `ecom_products`. <br> - If there are 0 rows, it goes to the `save_data_to_pg_group`. <br> - If there are 40 rows, it skips straight to table verification `verify_prod_tbl`. |
-| `save_data_to_pg_group`: `verify_api_data` | Checks each product from the Ecom Api against the Pydantic `ProductBase` schema and splits them into valid and invalid lists |
-| `save_data_to_pg_group`: `insert_data_to_pg` | Inserts the valid products list into Postgres `ecom_products` table |
-| `verify_prod_tbl` | Reads Postgres `ecom_products` table and uses Pandas `assert_frame_equal` to compare it with the expected data in [pytests/test_load_products/complete_prod_data.py](pytests/test_load_products/complete_prod_data.py). |
-| `save_to_tmp` | Adds `created_at`/`updated_at` and writes `/tmp/products.parquet` |
-| `upload_to_gcs` | Uploads the file to Google Cloud Storage `gs://<bucket>/products/products.parquet` |
-| `upload_to_bq` | Loads the file into `raw_data.raw_products` with **`WRITE_TRUNCATE`**, which replaces the table on every run |
-| `send_success_msg` | Posts a "Finished run" message to Discord |
+| Task | Operator | What it does |
+|---|---|---|
+| `fetch_products_api` | `@task` | Fetch data from Ecom Api `GET {ECOM_API_URL}/products/generate_all_products` |
+| `create_table_if_not_exists` | `@task` | Creates the Postgres table `ecom_products` (`product_id`, `fruit`, `category`, `price NUMERIC(8,2)`) if it is missing |
+| `check_prod_table_len` | `@task.branch` | **Branch.** - counts the rows in `ecom_products`. <br> - If there are 0 rows, it goes to the `save_data_to_pg_group`. <br> - If there are 40 rows, it skips straight to table verification `verify_prod_tbl`. |
+| `save_data_to_pg_group`: `verify_api_data` | `@task` (in `@task_group`) | Checks each product from the Ecom Api against the Pydantic `ProductBase` schema and splits them into valid and invalid lists |
+| `save_data_to_pg_group`: `insert_data_to_pg` | `@task` (in `@task_group`) | Inserts the valid products list into Postgres `ecom_products` table |
+| `verify_prod_tbl` | `@task` | Reads Postgres `ecom_products` table and uses Pandas `assert_frame_equal` to compare it with the expected data in [pytests/test_load_products/complete_prod_data.py](pytests/test_load_products/complete_prod_data.py). |
+| `save_to_tmp` | `@task` | Adds `created_at`/`updated_at` and writes `/tmp/products.parquet` |
+| `upload_to_gcs` | `LocalFilesystemToGCSOperator` | Uploads the file to Google Cloud Storage `gs://<bucket>/products/products.parquet` |
+| `upload_to_bq` | `GCSToBigQueryOperator` | Loads the file into `raw_data.raw_products` with **`WRITE_TRUNCATE`**, which replaces the table on every run |
+| `send_success_msg` | `@task` | Posts a "Finished run" message to Discord |
 
 > If the table holds any count other than 0 or 40, the branch picks no path and every later task is skipped.
 
@@ -156,7 +155,8 @@ Fetches 20 new fake customers each day, checks them, and appends them to BigQuer
 title: "Dag: load_customers"
 ---
 flowchart LR
-    A[fetch_api_data] --> B[verify_api_data]
+    A[fetch_api_data]
+    A --> B[verify_api_data]
     B --> C[save_to_tmp_folder]
     C --> D[upload_to_gcs]
     D --> E[create_bq_dataset]
@@ -164,42 +164,48 @@ flowchart LR
     F --> G[send_success_msg]
 ```
 
+
+| Task | Operator | What it does |
+|---|---|---|
+| `fetch_api_data` | `@task` | Fetch data from Ecom Api `GET {ECOM_API_URL}/customers/fake_customers?num=20` |
+| `verify_api_data` | `@task` | Checks each customer from the Api against Pydantic `CustomersBase` and splits them into valid and invalid lists |
+| `save_to_tmp_folder` | `@task` | Writes the valid customers to `/tmp/customers.parquet` |
+| `upload_to_gcs` | `LocalFilesystemToGCSOperator` | Uploads the file to Google Cloud Storage `gs://<bucket>/customers/date=YYYY-MM-DD/customers_YYYYMMDDTHHMMSS.parquet` (partitioned by run date) |
+| `create_bq_dataset` | `BigQueryCreateEmptyDatasetOperator` | Creates the `raw_data` dataset in `us-east1` if it does not exist yet |
+| `upload_to_bq` | `GCSToBigQueryOperator` | Loads every parquet file in that run day's folder into `raw_data.raw_customers` with `WRITE_APPEND` |
+| `send_success_msg` | `@task` | Posts a "Finished run" message to Discord |
+
 <br>
-
-| Task | What it does |
-|---|---|
-| `fetch_api_data` | `GET {ECOM_API_URL}/customers/fake_customers?num=20` |
-| `verify_api_data` | Checks each customer against `CustomersBase`: UUID id, valid email, date `signup_date`, and a `name` of exactly two words |
-| `save_to_tmp_folder` | Writes the valid customers to `/tmp/customers.parquet`. It casts `signup_date` to a date and adds `created_at`/`updated_at` without a timezone, so BigQuery reads them as `DATETIME`. If no customer is valid, it writes nothing. |
-| `upload_to_gcs` | Uploads to `gs://<bucket>/customers/date=YYYY-MM-DD/customers_YYYYMMDDTHHMMSS.parquet` (partitioned by run date) |
-| `create_bq_dataset` | Creates the `raw_data` dataset in `us-east1` if it does not exist yet (`exists_ok=True`) |
-| `upload_to_bq` | Loads every parquet file in that day's folder into `raw_data.raw_customers` with `WRITE_APPEND` and an explicit schema |
-| `send_success_msg` | Posts a Discord message |
-
----
 
 ### 3. `load_dbt`
 
-**File:** [dags/load_dbt.py](dags/load_dbt.py) · **Schedule:** none (manual trigger)
+- **File:** [dags/load_dbt.py](dags/load_dbt.py)
+- **Schedule:** none (manual trigger)
 
-Starts the dbt project, which runs as the Cloud Run job **`ecom-pj`**. That job's image is built and deployed by the GitHub Actions workflow in `.github/workflows/`. The DAG checks that the job exists first, then runs `dbt build --target dev`.
+Starts the dbt project, which runs as the Google Cloud Run job **`ecom-pj`**. 
+
+That job's image is built and deployed by the GitHub Actions  CI/CD workflow ([.github/workflows/dbt-ci.yml](.github/workflows/dbt-ci.yml)). The DAG checks that the job exists first, then runs `dbt build --target dev`.
+
 
 ```mermaid
-flowchart TD
-    A[list_jobs] --> B[show_jobs]
-    B --> C{check_job_exists}
+flowchart LR
+    A["list_jobs<br>(CloudRunListJobsOperator)"]
+    A --> B[show_jobs]
+    B --> C{Branch: <br>check_job_exists}
     C -- "ecom-pj found" --> D[job_exists]
     C -- "not found" --> E[job_not_exists]
-    D --> F[run_job<br/>dbt build --target dev]
+    D --> F["run_job<br>(CloudRunExecuteJobOperator)<br>dbt build --target dev"]
 ```
 
-| Task | What it does |
-|---|---|
-| `list_jobs` | `CloudRunListJobsOperator`: lists the Cloud Run jobs in `GCP_PROJECT_ID` / `GCP_REGION` |
-| `show_jobs` | Reduces each job's full resource name to its short name |
-| `check_job_exists` | **Branch.** Goes to `job_exists` if `ecom-pj` is in the list, otherwise to `job_not_exists` |
-| `job_exists` / `job_not_exists` | Log the result. The `job_not_exists` path ends the run there. |
-| `run_job` | `CloudRunExecuteJobOperator`: runs `ecom-pj` with the container args overridden to `dbt build --target dev` (300 s timeout) |
+<br>
+
+| Task | Operator | What it does |
+|---|---|---|
+| `list_jobs` | `CloudRunListJobsOperator` | Lists the Cloud Run jobs in `GCP_PROJECT_ID` / `GCP_REGION` |
+| `show_jobs` | `@task` | Reduces each job's full resource name to its short name |
+| `check_job_exists` | `@task.branch` | **Branch.** Goes to `job_exists` if `ecom-pj` is in the list, otherwise to `job_not_exists` |
+| `job_exists` / `job_not_exists` | `@task` | Log the result. The `job_not_exists` path ends the run there. |
+| `run_job` | `CloudRunExecuteJobOperator` | Runs `ecom-pj` with the container args overridden to `dbt build --target dev` (300 s timeout) |
 
 ---
 
@@ -219,15 +225,15 @@ flowchart LR
     F --> G[send_success_msg]
 ```
 
-| Task | What it does |
-|---|---|
-| `random_cust` | Picks 30 random rows from BigQuery `dev.dim_customers` (via [plugins/fn_fetch_random.py](plugins/fn_fetch_random.py)) |
-| `random_prod` | Picks 30 random rows from BigQuery `dev.dim_products` |
-| `generate_orders` | Creates 3–12 orders. Each order gets a UUID `order_id`, a random customer and product, a `quantity` from 1 to 20, and an `order_at` time set by Faker somewhere within the run's day (Asia/Taipei). |
-| `save_to_tmp` | Writes `/tmp/orders.parquet` and converts `order_at` to a timestamp so BigQuery reads it as `DATETIME` |
-| `upload_to_gcs` | Uploads to `gs://<bucket>/orders/date=YYYY-MM-DD/orders_YYYY-MM-DD.parquet` |
-| `upload_to_bq` | Loads the file into `raw_data.raw_orders` with `WRITE_APPEND` (`CREATE_IF_NEEDED`) |
-| `send_success_msg` | Posts a Discord message |
+| Task | Operator | What it does |
+|---|---|---|
+| `random_cust` | `@task` | Picks 30 random rows from BigQuery `dev.dim_customers` (via [plugins/fn_fetch_random.py](plugins/fn_fetch_random.py)) |
+| `random_prod` | `@task` | Picks 30 random rows from BigQuery `dev.dim_products` |
+| `generate_orders` | `@task` | Creates 3–12 orders. Each order gets a UUID `order_id`, a random customer and product, a `quantity` from 1 to 20, and an `order_at` time set by Faker somewhere within the run's day (Asia/Taipei). |
+| `save_to_tmp` | `@task` | Writes `/tmp/orders.parquet` and converts `order_at` to a timestamp so BigQuery reads it as `DATETIME` |
+| `upload_to_gcs` | `LocalFilesystemToGCSOperator` | Uploads to `gs://<bucket>/orders/date=YYYY-MM-DD/orders_YYYY-MM-DD.parquet` |
+| `upload_to_bq` | `GCSToBigQueryOperator` | Loads the file into `raw_data.raw_orders` with `WRITE_APPEND` (`CREATE_IF_NEEDED`) |
+| `send_success_msg` | `@task` | Posts a Discord message |
 
 ---
 
