@@ -29,6 +29,7 @@
 ## How the DAGs fit together
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TB
     subgraph ROW1["Ingestion (Products & Customers Data)"]
         direction LR
