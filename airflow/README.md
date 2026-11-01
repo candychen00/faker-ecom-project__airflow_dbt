@@ -179,10 +179,13 @@ flowchart LR
 
 Starts the dbt project, which runs as the Google Cloud Run job **`ecom-pj`**. 
 
-That job's image is built and deployed by the GitHub Actions  CI/CD workflow ([.github/workflows/dbt-ci.yml](../.github/workflows/dbt-ci.yml)). The DAG checks that the job exists first, then runs `dbt build --target dev`.
+The job's image **`ecom-pj`** is built and deployed by GitHub Actions CI/CD workflow ([.github/workflows/dbt-ci.yml](../.github/workflows/dbt-ci.yml)). The DAG checks that the job exists first, then runs `dbt build --target dev`.
 
 
 ```mermaid
+---
+title: "Dag: load_dbt"
+---
 flowchart LR
     A["list_jobs<br>(CloudRunListJobsOperator)"]
     A --> B["show_jobs<br>(@task)"]
@@ -208,9 +211,12 @@ flowchart LR
 
  · **File:** [dags/load_orders.py](dags/load_orders.py) · **Schedule:** `@daily` · **Start date:** 2026-08-01 (Asia/Taipei) · `catchup=False`
 
-Makes 3–12 fake orders per day from customers and products that already exist, so every order points to a real customer and product.
+Makes a random amount of fake orders (3 - 12 orders) per day from customers and products that already exist in BigQuery `dim_products` and `dim_customers` tables, so every order points to a real customer and product.
 
 ```mermaid
+---
+title: "Dag: load_orders"
+---
 flowchart LR
     A["random_cust<br>(@task)"] --> C["generate_orders<br>(@task)"]
     B["random_prod<br>(@task)"] --> C
@@ -222,15 +228,15 @@ flowchart LR
 
 | Task | Operator | What it does |
 |---|---|---|
-| `random_cust` | `@task` | Picks 30 random rows from BigQuery `dev.dim_customers` (via [plugins/fn_fetch_random.py](plugins/fn_fetch_random.py)) |
-| `random_prod` | `@task` | Picks 30 random rows from BigQuery `dev.dim_products` |
-| `generate_orders` | `@task` | Creates 3–12 orders. Each order gets a UUID `order_id`, a random customer and product, a `quantity` from 1 to 20, and an `order_at` time set by Faker somewhere within the run's day (Asia/Taipei). |
-| `save_to_tmp` | `@task` | Writes `/tmp/orders.parquet` and converts `order_at` to a timestamp so BigQuery reads it as `DATETIME` |
-| `upload_to_gcs` | `LocalFilesystemToGCSOperator` | Uploads to `gs://<bucket>/orders/date=YYYY-MM-DD/orders_YYYY-MM-DD.parquet` |
+| `random_cust` | `@task` | Picks 30 random customers from BigQuery `dev.dim_customers` (via [plugins/fn_fetch_random.py](plugins/fn_fetch_random.py)) |
+| `random_prod` | `@task` | Picks 30 random products from BigQuery `dev.dim_products` (via [plugins/fn_fetch_random.py](plugins/fn_fetch_random.py)) |
+| `generate_orders` | `@task` | Creates a random amount of orders (`random.randint(3,12)`). <br>Each order gets a UUID `order_id`, a random customer and product, a `quantity` from 1 to 20(`random.randint(1,20)`), and an `order_at` time set by Faker somewhere within the run's day (Asia/Taipei). |
+| `save_to_tmp` | `@task` | Writes `/tmp/orders.parquet` |
+| `upload_to_gcs` | `LocalFilesystemToGCSOperator` | Uploads the file to Google Cloud Storage `gs://<bucket>/orders/date=YYYY-MM-DD/orders_YYYY-MM-DD.parquet` |
 | `upload_to_bq` | `GCSToBigQueryOperator` | Loads the file into `raw_data.raw_orders` with `WRITE_APPEND` (`CREATE_IF_NEEDED`) |
-| `send_success_msg` | `@task` | Posts a Discord message |
+| `send_success_msg` | `@task` | Posts a "Finished run" message to Discord |
 
----
+<br><br>
 
 ## Folder structure
 
@@ -240,10 +246,7 @@ airflow/
 │   ├── load_products.py           # Products: API → Postgres → GCS → BQ
 │   ├── load_customers.py          # Customers: API → GCS → BQ (daily)
 │   ├── load_orders.py             # Orders: generated from dim tables → GCS → BQ (daily)
-│   ├── load_dbt.py                # Starts the dbt Cloud Run job
-│   ├── data_generation/
-│   │   └── load_gcs_to_bq.py      # Unfinished draft (no DAG defined yet)
-│   └── tests/                     # Test DAGs (Discord, Neon, Postgres); gitignored
+│   └── load_dbt.py                # Starts the dbt Cloud Run job
 ├── plugins/                       # Shared helpers, imported as `plugins.*`
 │   ├── fn_api_get.py              # get_api_data(): GET request with error handling
 │   ├── fn_api_verification.py     # verify_api(): Pydantic check → valid / invalid lists
