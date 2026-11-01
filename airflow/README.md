@@ -95,8 +95,7 @@ flowchart TB
 
 ### 1. `load_products`
 
-- **File:** [dags/load_products.py](dags/load_products.py)
-- **Schedule:** none (manual trigger)
+ · **File:** [dags/load_products.py](dags/load_products.py) · **Schedule:** none (manual trigger)
 
 Loads the fixed product catalogue (40 products) from the Api into PostgresDB. The DAG verifies the data, and then copies it into BigQuery.
 
@@ -141,10 +140,7 @@ flowchart LR
 
 ### 2. `load_customers`
 
-- **File:** [dags/load_customers.py](dags/load_customers.py) · 
-- **Schedule:** `@daily` · 
-- **Start date:** 2026-10-01 (Asia/Taipei)
-- `catchup=False`
+ · **File:** [dags/load_customers.py](dags/load_customers.py) · **Schedule:** `@daily` · **Start date:** 2026-10-01 (Asia/Taipei) · `catchup=False`
 
 Fetches 20 new fake customers each day, checks them, and appends them to BigQuery.
 
@@ -179,8 +175,7 @@ flowchart LR
 
 ### 3. `load_dbt`
 
-- **File:** [dags/load_dbt.py](dags/load_dbt.py)
-- **Schedule:** none (manual trigger)
+ · **File:** [dags/load_dbt.py](dags/load_dbt.py) · **Schedule:** none (manual trigger)
 
 Starts the dbt project, which runs as the Google Cloud Run job **`ecom-pj`**. 
 
@@ -201,17 +196,17 @@ flowchart LR
 
 | Task | Operator | What it does |
 |---|---|---|
-| `list_jobs` | `CloudRunListJobsOperator` | Lists the Cloud Run jobs in `GCP_PROJECT_ID` / `GCP_REGION` |
-| `show_jobs` | `@task` | Reduces each job's full resource name to its short name |
-| `check_job_exists` | `@task.branch` | **Branch.** Goes to `job_exists` if `ecom-pj` is in the list, otherwise to `job_not_exists` |
+| `list_jobs` | `CloudRunListJobsOperator` | Lists the Cloud Run jobs |
+| `show_jobs` | `@task` | Reduces each job's full resource name to its short name, and save in a list |
+| `check_job_exists` | `@task.branch` | **Branch.** <br>Goes to `job_exists` if `ecom-pj` is in the job list, otherwise to `job_not_exists` |
 | `job_exists` / `job_not_exists` | `@task` | Log the result. The `job_not_exists` path ends the run there. |
-| `run_job` | `CloudRunExecuteJobOperator` | Runs `ecom-pj` with the container args overridden to `dbt build --target dev` (300 s timeout) |
+| `run_job` | `CloudRunExecuteJobOperator` | Runs `ecom-pj` with the container args overridden to `dbt build --target dev` |
 
----
+<br>
 
 ### 4. `load_orders`
 
-**File:** [dags/load_orders.py](dags/load_orders.py) · **Schedule:** `@daily` · **Start date:** 2026-08-01 (Asia/Taipei) · `catchup=False`
+ · **File:** [dags/load_orders.py](dags/load_orders.py) · **Schedule:** `@daily` · **Start date:** 2026-08-01 (Asia/Taipei) · `catchup=False`
 
 Makes 3–12 fake orders per day from customers and products that already exist, so every order points to a real customer and product.
 
