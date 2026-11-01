@@ -1,4 +1,4 @@
-# Airflow — Faker E-commerce Pipeline
+# Airflow — E-commerce Pipeline
 
 - This folder holds the Airflow side of the project. The DAGs pull fake e-commerce data (products, customers, orders), check it, land it in **Google Cloud Storage**, load it into **BigQuery** (`raw_data` dataset), start the **dbt** transformations as a Cloud Run job.
 
@@ -32,7 +32,7 @@
 flowchart TB
     subgraph ROW1["Ingestion (Products & Customers Data)"]
         direction LR
-        API[(Ecom API)]
+        API(Ecom API)
         PG[(Neon<br>PostgresDB)]
         GCS[(GCS bucket)]
         RAW[(BigQuery<br/>raw_data.*)]
@@ -53,13 +53,20 @@ flowchart TB
     API -- dag: load_products --> PG
     PG -- dag: load_products --> GCS
     API -- dag: load_customers --> GCS
-    GCS -- "dag: load_products<br>dag: load_customers" --> RAW
+    GCS -- dag: load_products --> RAW
+    GCS -- dag: load_customers --> RAW
 
     BQ_DIM -- dag: load_orders --> BQ_FCT
 
     DBT -- dag: load_dbt --> DEV
 
     ROW1 --> ROW2 --> ROW3
+
+    %% Edge indices follow declaration order (0-based)
+    linkStyle 0,1,3 stroke:#2563eb,stroke-width:2px,color:#2563eb
+    linkStyle 2,4 stroke:#16a34a,stroke-width:2px,color:#16a34a
+    linkStyle 5 stroke:#ea580c,stroke-width:2px,color:#ea580c
+    linkStyle 6 stroke:#9333ea,stroke-width:2px,color:#9333ea
 ```
 
 | DAG | Schedule | Source | Destination |
