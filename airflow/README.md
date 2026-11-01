@@ -107,18 +107,18 @@ Loads the fixed product catalogue (40 products) from the Api into PostgresDB. Th
 title: "Dag: load_products"
 ---
 flowchart LR
-    A[fetch_products_api] --> B[create_table_if_not_exists]
-    B --> C{Branch: <br>check_prod_table_len}
+    A["fetch_products_api<br>(@task)"] --> B["create_table_if_not_exists<br>(@task)"]
+    B --> C{"Branch: <br>check_prod_table_len<br>(@task.branch)"}
     C -- "count = 0" --> G
-    subgraph G[save_data_to_pg_group]
-        G1[verify_api_data] --> G2[insert_data_to_pg]
+    subgraph G["save_data_to_pg_group (@task_group)"]
+        G1["verify_api_data<br>(@task)"] --> G2["insert_data_to_pg<br>(@task)"]
     end
     C -- "count = 40" --> D
-    G --> D[verify_prod_tbl]
-    D --> E[save_to_tmp]
-    E --> F[upload_to_gcs]
-    F --> H[upload_to_bq]
-    H --> I[send_success_msg]
+    G --> D["verify_prod_tbl<br>(@task)"]
+    D --> E["save_to_tmp<br>(@task)"]
+    E --> F["upload_to_gcs<br>(LocalFilesystemToGCSOperator)"]
+    F --> H["upload_to_bq<br>(GCSToBigQueryOperator)"]
+    H --> I["send_success_msg<br>(@task)"]
 ```
 
 
@@ -155,13 +155,13 @@ Fetches 20 new fake customers each day, checks them, and appends them to BigQuer
 title: "Dag: load_customers"
 ---
 flowchart LR
-    A[fetch_api_data]
-    A --> B[verify_api_data]
-    B --> C[save_to_tmp_folder]
-    C --> D[upload_to_gcs]
-    D --> E[create_bq_dataset]
-    E --> F[upload_to_bq]
-    F --> G[send_success_msg]
+    A["fetch_api_data<br>(@task)"]
+    A --> B["verify_api_data<br>(@task)"]
+    B --> C["save_to_tmp_folder<br>(@task)"]
+    C --> D["upload_to_gcs<br>(LocalFilesystemToGCSOperator)"]
+    D --> E["create_bq_dataset<br>(BigQueryCreateEmptyDatasetOperator)"]
+    E --> F["upload_to_bq<br>(GCSToBigQueryOperator)"]
+    F --> G["send_success_msg<br>(@task)"]
 ```
 
 
@@ -190,10 +190,10 @@ That job's image is built and deployed by the GitHub Actions  CI/CD workflow ([.
 ```mermaid
 flowchart LR
     A["list_jobs<br>(CloudRunListJobsOperator)"]
-    A --> B[show_jobs]
-    B --> C{Branch: <br>check_job_exists}
-    C -- "ecom-pj found" --> D[job_exists]
-    C -- "not found" --> E[job_not_exists]
+    A --> B["show_jobs<br>(@task)"]
+    B --> C{"Branch: <br>check_job_exists<br>(@task.branch)"}
+    C -- "ecom-pj found" --> D["job_exists<br>(@task)"]
+    C -- "not found" --> E["job_not_exists<br>(@task)"]
     D --> F["run_job<br>(CloudRunExecuteJobOperator)<br>dbt build --target dev"]
 ```
 
@@ -217,12 +217,12 @@ Makes 3–12 fake orders per day from customers and products that already exist,
 
 ```mermaid
 flowchart LR
-    A[random_cust] --> C[generate_orders]
-    B[random_prod] --> C
-    C --> D[save_to_tmp]
-    D --> E[upload_to_gcs]
-    E --> F[upload_to_bq]
-    F --> G[send_success_msg]
+    A["random_cust<br>(@task)"] --> C["generate_orders<br>(@task)"]
+    B["random_prod<br>(@task)"] --> C
+    C --> D["save_to_tmp<br>(@task)"]
+    D --> E["upload_to_gcs<br>(LocalFilesystemToGCSOperator)"]
+    E --> F["upload_to_bq<br>(GCSToBigQueryOperator)"]
+    F --> G["send_success_msg<br>(@task)"]
 ```
 
 | Task | Operator | What it does |
