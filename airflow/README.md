@@ -100,7 +100,12 @@ flowchart TB
 
 Loads the fixed product catalogue (40 products) from the Api into PostgresDB. The DAG verifies the data, and then copies it into BigQuery.
 
+<br>
+
 ```mermaid
+---
+title: "Dag: load_products"
+---
 flowchart LR
     A[fetch_products_api] --> B[create_table_if_not_exists]
     B --> C{check_prod_table_len}
@@ -116,30 +121,40 @@ flowchart LR
     H --> I[send_success_msg]
 ```
 
+<br>
+
 | Task | What it does |
 |---|---|
 | `fetch_products_api` |  Fetch data from Ecom Api `GET {ECOM_API_URL}/products/generate_all_products` |
 | `create_table_if_not_exists` | Creates the Postgres table `ecom_products` (`product_id`, `fruit`, `category`, `price NUMERIC(8,2)`) if it is missing |
 | `check_prod_table_len` | **Branch.** - counts the rows in `ecom_products`. <br> - If there are 0 rows, it goes to the `save_data_to_pg_group`. <br> - If there are 40 rows, it skips straight to table verification `verify_prod_tbl`. |
-| `save_data_to_pg_group` → `verify_api_data` | Checks each product against the Pydantic `ProductBase` schema and splits them into valid and invalid lists |
-| `save_data_to_pg_group` → `insert_data_to_pg` | Inserts the valid products into `ecom_products` |
-| `verify_prod_tbl` | Reads `ecom_products` and uses `assert_frame_equal` to compare it with the expected data in [pytests/test_load_products/complete_prod_data.py](pytests/test_load_products/complete_prod_data.py). Uses trigger rule `none_failed_min_one_success`, so it runs after either branch. |
-| `save_to_tmp` | Adds `created_at`/`updated_at` and writes `/tmp/products.parquet` with an explicit pyarrow schema. `price` is written as `decimal128(8,2)` so BigQuery reads it as `NUMERIC`. |
-| `upload_to_gcs` | Uploads the file to `gs://<bucket>/products/products.parquet` |
+| `save_data_to_pg_group`: `verify_api_data` | Checks each product from the Ecom Api against the Pydantic `ProductBase` schema and splits them into valid and invalid lists |
+| `save_data_to_pg_group`: `insert_data_to_pg` | Inserts the valid products list into Postgres `ecom_products` table |
+| `verify_prod_tbl` | Reads Postgres `ecom_products` table and uses Pandas `assert_frame_equal` to compare it with the expected data in [pytests/test_load_products/complete_prod_data.py](pytests/test_load_products/complete_prod_data.py). |
+| `save_to_tmp` | Adds `created_at`/`updated_at` and writes `/tmp/products.parquet` |
+| `upload_to_gcs` | Uploads the file to Google Cloud Storage `gs://<bucket>/products/products.parquet` |
 | `upload_to_bq` | Loads the file into `raw_data.raw_products` with **`WRITE_TRUNCATE`**, which replaces the table on every run |
 | `send_success_msg` | Posts a "Finished run" message to Discord |
 
 > If the table holds any count other than 0 or 40, the branch picks no path and every later task is skipped.
 
----
+<br>
 
 ### 2. `load_customers`
 
-**File:** [dags/load_customers.py](dags/load_customers.py) · **Schedule:** `@daily` · **Start date:** 2026-10-01 (Asia/Taipei) · `catchup=False`
+- **File:** [dags/load_customers.py](dags/load_customers.py) · 
+- **Schedule:** `@daily` · 
+- **Start date:** 2026-10-01 (Asia/Taipei)
+- `catchup=False`
 
 Fetches 20 new fake customers each day, checks them, and appends them to BigQuery.
 
+<br>
+
 ```mermaid
+---
+title: "Dag: load_customers"
+---
 flowchart LR
     A[fetch_api_data] --> B[verify_api_data]
     B --> C[save_to_tmp_folder]
@@ -148,6 +163,8 @@ flowchart LR
     E --> F[upload_to_bq]
     F --> G[send_success_msg]
 ```
+
+<br>
 
 | Task | What it does |
 |---|---|
