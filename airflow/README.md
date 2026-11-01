@@ -48,7 +48,9 @@ flowchart TB
     subgraph ROW3["Transformation (DBT on BigQuery)"]
         direction LR
         DBT[[Cloud Run job<br>dbt build]]
-        DEV[(BigQuery<br/>dev.dim_* & fct_*)]
+        BQ_RAW[(BigQuery<br/>raw_data.raw_*)]
+        BQ_INT[(BigQuery<br/>dev.int_*)]
+        BQ_DIM_FCT[(BigQuery<br/>dev.dim_* & fct_*)]
     end
 
     API -- dag: load_products --> PG
@@ -59,7 +61,7 @@ flowchart TB
 
     BQ_DIM -- dag: load_orders --> BQ_FCT
 
-    DBT -- dag: load_dbt --> DEV
+    DBT -- dag: load_dbt --> BQ_RAW --> BQ_INT --> BQ_DIM_FCT
 
     ROW1 --> ROW2 --> ROW3
 
@@ -67,7 +69,7 @@ flowchart TB
     linkStyle 0,1,3 stroke:#2563eb,stroke-width:2px,color:#2563eb
     linkStyle 2,4 stroke:#16a34a,stroke-width:2px,color:#16a34a
     linkStyle 5 stroke:#ea580c,stroke-width:2px,color:#ea580c
-    linkStyle 6 stroke:#9333ea,stroke-width:2px,color:#9333ea
+    linkStyle 6,7,8 stroke:#9333ea,stroke-width:2px,color:#9333ea
 ```
 
 | DAG | Schedule | Source | Destination |
