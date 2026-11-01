@@ -95,19 +95,20 @@ flowchart TB
 
 ### 1. `load_products`
 
-**File:** [dags/load_products.py](dags/load_products.py) · **Schedule:** none (manual trigger)
+- **File:** [dags/load_products.py](dags/load_products.py)
+- **Schedule:** none (manual trigger)
 
-Loads the fixed product catalogue (40 products) into Postgres and BigQuery. Postgres (Neon) is the source of truth for products. The DAG fills it once, checks it against an expected snapshot, and then copies it into BigQuery.
+Loads the fixed product catalogue (40 products) from the Api into PostgresDB. The DAG verifies the data, and then copies it into BigQuery.
 
 ```mermaid
 flowchart LR
     A[fetch_products_api] --> B[create_table_if_not_exists]
     B --> C{check_prod_table_len}
-    C -- "count == 0" --> G
+    C -- "count = 0" --> G
     subgraph G[save_data_to_pg_group]
         G1[verify_api_data] --> G2[insert_data_to_pg]
     end
-    C -- "count == 40" --> D
+    C -- "count = 40" --> D
     G --> D[verify_prod_tbl]
     D --> E[save_to_tmp]
     E --> F[upload_to_gcs]
@@ -117,9 +118,9 @@ flowchart LR
 
 | Task | What it does |
 |---|---|
-| `fetch_products_api` | `GET {ECOM_API_URL}/products/generate_all_products` |
+| `fetch_products_api` |  Fetch data from Ecom Api `GET {ECOM_API_URL}/products/generate_all_products` |
 | `create_table_if_not_exists` | Creates the Postgres table `ecom_products` (`product_id`, `fruit`, `category`, `price NUMERIC(8,2)`) if it is missing |
-| `check_prod_table_len` | **Branch.** Counts the rows in `ecom_products`. If there are 0 rows, it goes to the insert group. If there are 40 rows, it skips straight to verification. |
+| `check_prod_table_len` | **Branch.** - counts the rows in `ecom_products`. <br> - If there are 0 rows, it goes to the `save_data_to_pg_group`. <br> - If there are 40 rows, it skips straight to table verification `verify_prod_tbl`. |
 | `save_data_to_pg_group` → `verify_api_data` | Checks each product against the Pydantic `ProductBase` schema and splits them into valid and invalid lists |
 | `save_data_to_pg_group` → `insert_data_to_pg` | Inserts the valid products into `ecom_products` |
 | `verify_prod_tbl` | Reads `ecom_products` and uses `assert_frame_equal` to compare it with the expected data in [pytests/test_load_products/complete_prod_data.py](pytests/test_load_products/complete_prod_data.py). Uses trigger rule `none_failed_min_one_success`, so it runs after either branch. |
@@ -139,7 +140,7 @@ flowchart LR
 Fetches 20 new fake customers each day, checks them, and appends them to BigQuery.
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[fetch_api_data] --> B[verify_api_data]
     B --> C[save_to_tmp_folder]
     C --> D[upload_to_gcs]
@@ -192,7 +193,7 @@ flowchart TD
 Makes 3–12 fake orders per day from customers and products that already exist, so every order points to a real customer and product.
 
 ```mermaid
-flowchart TD
+flowchart LR
     A[random_cust] --> C[generate_orders]
     B[random_prod] --> C
     C --> D[save_to_tmp]
