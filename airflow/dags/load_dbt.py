@@ -18,7 +18,7 @@ GCP_CLOUD_RUN_JOB_NAME = "ecom-pj"
 @dag(
     schedule=None
 )
-def load_products_dbt():
+def load_dbt():
 
     list_jobs = CloudRunListJobsOperator(
         task_id = "list_jobs",
@@ -74,12 +74,12 @@ def load_products_dbt():
         region= GCP_REGION,
 
         job_name= GCP_CLOUD_RUN_JOB_NAME,
-        timeout_seconds= 180,
+        timeout_seconds= 300,
         verbose= True,
         overrides={
             "container_overrides": [
                 {
-                    "args": ["dbt", "build", "-s", "tag:prod", "--target", "ci"],
+                    "args": ["dbt", "build", "--target", "dev"] ,
                 }
             ]
         }
@@ -97,5 +97,5 @@ def load_products_dbt():
     exist >> run_j
 
 
-load_products_dbt()
+load_dbt()
 
