@@ -53,8 +53,8 @@ flowchart TB
     API -- dag: load_products --> PG
     PG -- dag: load_products --> GCS
     API -- dag: load_customers --> GCS
-    GCS -- dag: load_products --> RAW
-    GCS -- dag: load_customers --> RAW
+    GCS -- dag: load_products ----> RAW
+    GCS -- dag: load_customers ----> RAW
 
     BQ_DIM -- dag: load_orders --> BQ_FCT
 
