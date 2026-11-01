@@ -179,7 +179,7 @@ flowchart LR
 
 Starts the dbt project, which runs as the Google Cloud Run job **`ecom-pj`**. 
 
-That job's image is built and deployed by the GitHub Actions  CI/CD workflow ([.github/workflows/dbt-ci.yml](github/workflows/dbt-ci.yml)). The DAG checks that the job exists first, then runs `dbt build --target dev`.
+That job's image is built and deployed by the GitHub Actions  CI/CD workflow ([.github/workflows/dbt-ci.yml](../.github/workflows/dbt-ci.yml)). The DAG checks that the job exists first, then runs `dbt build --target dev`.
 
 
 ```mermaid
