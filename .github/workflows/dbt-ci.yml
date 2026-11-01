@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "dbt/**"
+      - "dbt/ecom_dbt_pj/**"
       - ".github/workflows/dbt-ci.yml"
 
   workflow_dispatch:
